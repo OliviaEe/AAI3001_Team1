@@ -1,0 +1,2 @@
+Detector,Detector Checkpoint,Input Size,Confidence Threshold,Validation Recall Target Met,Classifier Checkpoint,Classifier Input Size,Classifier Rejection Threshold,Classifier Recall Target Met
+Experiment 3: YOLOv8s,/kaggle/working/CVDL_Final_Evaluation/models/final_best.pt,640,0.3,True,/kaggle/working/CVDL_Final_Evaluation/models/experiment6_classifier_best.pt,96,0.2,False

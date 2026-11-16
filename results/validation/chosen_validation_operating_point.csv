@@ -1,0 +1,2 @@
+Model,Input Size,Confidence Threshold,Recall Target,Target Met,Precision,Recall,F1,TP,FP,FN,FP_per_image,Misses_per_100_images,Empty_scene_alarm_rate
+Experiment 3: YOLOv8s,640,0.3,0.85,True,0.8627763847731935,0.8661327231121282,0.8644512961059723,3785,602,585,0.23424124513618677,22.762645914396888,

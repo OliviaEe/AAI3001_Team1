@@ -1,0 +1,20 @@
+{
+  "selected_experiment": 3,
+  "architecture": "YOLOv8s",
+  "checkpoint": "weights/final_best.pt",
+  "input_size": 640,
+  "confidence_threshold": 0.3,
+  "classifier_enabled": false,
+  "selection_rule": "highest clean-validation mAP@50-95",
+  "classes": {
+    "0": "battery",
+    "1": "coin_battery",
+    "2": "coin",
+    "3": "small_object",
+    "4": "pen",
+    "5": "sharp",
+    "6": "medicine"
+  },
+  "configuration_record_only": true,
+  "integration_pending": "Review legacy spatial weights for seven grouped labels; this JSON is not automatically loaded by the app."
+}

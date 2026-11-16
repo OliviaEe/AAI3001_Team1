@@ -1,0 +1,11 @@
+Model,Set,Size Group,Recall,Objects
+Experiment 3: YOLOv8s,stress,16–32,0.691609977324263,441
+Experiment 3: YOLOv8s,stress,32–64,0.8040752351097179,1276
+Experiment 3: YOLOv8s,stress,64+,0.8818297331639136,2361
+Experiment 3: YOLOv8s,stress,8–16,0.4431818181818182,88
+Experiment 3: YOLOv8s,stress,under 8,0.0,7
+Experiment 3: YOLOv8s,test,16–32,0.6486486486486487,148
+Experiment 3: YOLOv8s,test,32–64,0.7971014492753623,621
+Experiment 3: YOLOv8s,test,64+,0.9166421207658321,3395
+Experiment 3: YOLOv8s,test,8–16,0.16666666666666666,6
+Experiment 3: YOLOv8s,test,under 8,0.0,3

@@ -1,0 +1,61 @@
+Model,Set,Size Group,Recall,Objects
+Baseline: YOLOv8n,stress,16–32,0.6213151927437641,441
+Baseline: YOLOv8n,stress,32–64,0.7672413793103449,1276
+Baseline: YOLOv8n,stress,64+,0.8513341804320204,2361
+Baseline: YOLOv8n,stress,8–16,0.36363636363636365,88
+Baseline: YOLOv8n,stress,under 8,0.0,7
+Baseline: YOLOv8n,test,16–32,0.5202702702702703,148
+Baseline: YOLOv8n,test,32–64,0.7552334943639292,621
+Baseline: YOLOv8n,test,64+,0.8868924889543446,3395
+Baseline: YOLOv8n,test,8–16,0.16666666666666666,6
+Baseline: YOLOv8n,test,under 8,0.0,3
+Experiment 1: lower learning rate,stress,16–32,0.6394557823129252,441
+Experiment 1: lower learning rate,stress,32–64,0.7547021943573667,1276
+Experiment 1: lower learning rate,stress,64+,0.8479457856840322,2361
+Experiment 1: lower learning rate,stress,8–16,0.36363636363636365,88
+Experiment 1: lower learning rate,stress,under 8,0.0,7
+Experiment 1: lower learning rate,test,16–32,0.5675675675675675,148
+Experiment 1: lower learning rate,test,32–64,0.7777777777777778,621
+Experiment 1: lower learning rate,test,64+,0.8877761413843888,3395
+Experiment 1: lower learning rate,test,8–16,0.0,6
+Experiment 1: lower learning rate,test,under 8,0.0,3
+Experiment 2: input size 960,stress,16–32,0.5810055865921788,179
+Experiment 2: input size 960,stress,32–64,0.7127659574468085,752
+Experiment 2: input size 960,stress,64+,0.8011823273179838,3214
+Experiment 2: input size 960,stress,8–16,0.24,25
+Experiment 2: input size 960,stress,under 8,0.0,3
+Experiment 2: input size 960,test,16–32,0.6111111111111112,36
+Experiment 2: input size 960,test,32–64,0.6904761904761905,294
+Experiment 2: input size 960,test,64+,0.8757165190203231,3838
+Experiment 2: input size 960,test,8–16,0.0,3
+Experiment 2: input size 960,test,under 8,0.0,2
+Experiment 3: YOLOv8s,stress,16–32,0.691609977324263,441
+Experiment 3: YOLOv8s,stress,32–64,0.8040752351097179,1276
+Experiment 3: YOLOv8s,stress,64+,0.8818297331639136,2361
+Experiment 3: YOLOv8s,stress,8–16,0.4431818181818182,88
+Experiment 3: YOLOv8s,stress,under 8,0.0,7
+Experiment 3: YOLOv8s,test,16–32,0.6486486486486487,148
+Experiment 3: YOLOv8s,test,32–64,0.7971014492753623,621
+Experiment 3: YOLOv8s,test,64+,0.9166421207658321,3395
+Experiment 3: YOLOv8s,test,8–16,0.16666666666666666,6
+Experiment 3: YOLOv8s,test,under 8,0.0,3
+Experiment 4: YOLOv8s-P2,stress,16–32,0.6643990929705216,441
+Experiment 4: YOLOv8s-P2,stress,32–64,0.8017241379310345,1276
+Experiment 4: YOLOv8s-P2,stress,64+,0.8614993646759848,2361
+Experiment 4: YOLOv8s-P2,stress,8–16,0.42045454545454547,88
+Experiment 4: YOLOv8s-P2,stress,under 8,0.0,7
+Experiment 4: YOLOv8s-P2,test,16–32,0.6148648648648649,148
+Experiment 4: YOLOv8s-P2,test,32–64,0.7987117552334944,621
+Experiment 4: YOLOv8s-P2,test,64+,0.9010309278350516,3395
+Experiment 4: YOLOv8s-P2,test,8–16,0.16666666666666666,6
+Experiment 4: YOLOv8s-P2,test,under 8,0.0,3
+Experiment 5: YOLOv8s-P2 input size 960,stress,16–32,0.6256983240223464,179
+Experiment 5: YOLOv8s-P2 input size 960,stress,32–64,0.7180851063829787,752
+Experiment 5: YOLOv8s-P2 input size 960,stress,64+,0.8095830740510268,3214
+Experiment 5: YOLOv8s-P2 input size 960,stress,8–16,0.24,25
+Experiment 5: YOLOv8s-P2 input size 960,stress,under 8,0.0,3
+Experiment 5: YOLOv8s-P2 input size 960,test,16–32,0.5277777777777778,36
+Experiment 5: YOLOv8s-P2 input size 960,test,32–64,0.717687074829932,294
+Experiment 5: YOLOv8s-P2 input size 960,test,64+,0.8712871287128713,3838
+Experiment 5: YOLOv8s-P2 input size 960,test,8–16,0.0,3
+Experiment 5: YOLOv8s-P2 input size 960,test,under 8,0.0,2

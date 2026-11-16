@@ -1,43 +1,34 @@
 # Child Safety Monitor
 
-Streamlit UI for live camera monitoring, image/video testing, and Telegram alerts.
+A team computer-vision prototype combining hazard detection, a person reference, relative-depth/spatial analysis, a Streamlit interface and Telegram caregiver alerts.
 
-Full pipeline (`HazardSpatialClassifier`), used when `weights/final_best.pt` exists:
+## Documentation
+
+| Guide | What it covers |
+|---|---|
+| [UI and application guide](docs/UI_GUIDE.md) | Installation, camera controls, image/video testing, spatial/depth integration, Telegram and deployment |
+| [Model experiments, results and limitations](docs/MODEL_RESULTS.md) | Baseline and six experiments, evaluation protocol, selected configuration, findings, limitations, future work and artifact records |
+| [Executed notebook](Child_Safety_Hazard_Detection_YOLOv8.ipynb) | Full preparation/training/evaluation code and recorded outputs |
+
+## Selected hazard detector
+
+**Experiment 3: YOLOv8s, input size 640, confidence threshold 0.30, detector-only.** It has the highest mAP@50–95 among the six detectors across clean validation, validation stress, clean test and test stress. Clean-test mAP@50–95 is **0.6549**, and test-stress mAP@50–95 is **0.6080**.
+
+Experiment 6 obtains **96.63% crop-validation accuracy**, but adding it to the detector increases missed hazards and false detections. It is retained as an experiment, not recommended for the final operating configuration.
+
+## System scope and integration status
 
 ```text
-camera frame -> Tze's trained YOLOv8 (14 hazard classes)  -> hazards  -+
-             -> stock YOLOv8s (COCO "person")             -> person   -+-> SpatialAnalyzer
-             -> Depth Anything V2 (background thread)     -> depth    -+   -> danger level
+Camera/image/video -> trained hazard detector ----+
+                  -> COCO person detector --------+-> relative spatial assessment -> UI / optional alerts
+                  -> relative-depth estimation --+
 ```
 
-Put the notebook's final model (Drive: Colab Notebooks > CVDL Model >
-`final_best.pt`) in `weights/` and restart. `weights/` is not in Git, so each
-person copies it once; `HAZARD_MODEL_PATH` can point elsewhere. Without it, the
-app uses the spatial team's stock-YOLO demo (`SpatialDemoClassifier`: person,
-knife and scissors only). The Live page shows which one is running, and a
-model that fails to load is shown as an error with demo mode.
+The person detector does not establish age. Relative proximity is not a distance measurement in metres, and absence of detections is not proof of safety.
 
-`weights/yolov8s.pt` (person model) downloads automatically on first run, and so
-does the depth model (needs `transformers` and internet once). A person stands
-in for the child reference; this model does not identify age.
+**Integration work remains:** the selected model outputs seven hazard groups, while the current app spatial weights still use the legacy fourteen-class labels. The mapping for `small_object`, `sharp`, `medicine`, and the merged `pen` group must be reviewed. Model evaluation does not validate the complete live camera/depth/alert pipeline. App code is unchanged by this documentation update.
 
-The UI owns one browser camera stream; it imports the demo's helper functions
-without running its camera-opening `main()`. Live depth runs in the background
-with one outstanding frame, and the team's one-second `ScoreHold` is per stream.
-Image/video tests compute depth from each tested frame. The spatial and depth
-source files remain unchanged. No object tracker or additional Python module
-was added.
-
-CPU depth can take several seconds. The proximity panel shows the map's age;
-video and detection can stay live while depth-based distance updates lag behind.
-Observed map ages ranged from approximately 5–15 seconds, so current boxes may
-be assessed against older depth data. Duplicate detections and live proximity
-accuracy still need model/pipeline validation; functional UI integration does
-not establish that a displayed SAFE level describes the current scene accurately.
-Distinguish this timing limitation from the spatial risk formula when refining
-the pipeline. Distances are relative box-height units, not metres.
-
-## Run
+## Quick start
 
 ```powershell
 python -m venv .venv
@@ -45,113 +36,16 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-The improved UI is in `app.py`: live camera controls, image and video testing, and four
-separate status cards for Assessment, Detected objects, Proximity assessment,
-and Caregiver alerts. The assessment displays the team's score and explanation.
-The Settings button is on the navigation row. Automatic Telegram alerts are
-disabled while `DummyClassifier` is selected; manual test messages are available.
+Obtain the selected checkpoint separately and place it at `weights/final_best.pt`, or configure `HAZARD_MODEL_PATH`. Weights are ignored by Git. Without the trained checkpoint, the app uses its stock-model demo/fallback as described in the [UI guide](docs/UI_GUIDE.md).
 
-The training notebook currently targets Google Colab and Google Drive. Its
-`google.colab` imports and dataset/output paths need adapting for local training.
-The single `requirements.txt` includes both UI and training dependencies.
+## Experiment records in this repository
 
-## Files and ownership
+- `results/model_training/validation/`: recorded validation scores and threshold sweeps.
+- `results/model_training/final_test/`: detector, pipeline, class, size and controlled-condition CSV results.
+- `results/model_training/training_history/`: original epoch histories and run arguments for the completed baseline and Experiments 1–6.
+- `results/model_training/split_membership.csv`: exported filenames, categories, photo groups and split assignments; no image files.
+- `figures/model_training/`: selected evaluation and training figures.
+- `configs/model_training/selected_detector.json`: recommended settings and seven-class mapping. This is a record, not an automatically loaded app configuration.
+- `configs/model_training/artifact_manifest.json`: source runs, checkpoint hashes, notebook hash and copied-record checksums.
 
-| File | Purpose | Owners |
-|---|---|---|
-| `app.py` | Improved UI, camera controls, four status cards, image & video tester, Telegram setup, Settings, and alert history | Liv & Ren |
-| `modules/camera.py` | Browser camera frames, background inference, overlays, and video analysis | Liv & Ren |
-| `modules/notifier.py` | Telegram send queue (rate limits, photo reuse) and per-room cooldown | Liv & Ren |
-| `modules/subscriptions.py` | Homes, rooms, members (SQLite) and bot commands | Liv & Ren |
-| `modules/detector.py` | `YOLODetector` for the trained hazard model; finds `final_best.pt` | Tze |
-| `modules/spatial.py` | Spatial interface and proximity/risk calculation | Ayumi & Nic |
-| `modules/classifier.py` | Shared result types and pipeline integration | Shared |
-| `Child_Safety_Hazard_Detection_YOLOv8.ipynb` | Augmentation, training, and evaluation | Tze |
-
-## Integration
-
-```text
-BGR image -> detector.detect() -> spatial.assess() -> ClassificationResult -> UI/alerts
-```
-
-**Tze:** implement `YOLODetector` in `modules/detector.py`. Load weights once in
-`__init__()`. `detect(frame_bgr)` accepts an OpenCV BGR image and returns a
-`list[Detection]`, with labels, confidence in `[0, 1]`, and bounding boxes
-`(x1, y1, x2, y2)` in the original image's pixels. Keep augmentation in training.
-
-**Ayumi & Nic:** implement `SpatialAnalyzer.assess(detections, frame_shape)` in
-`modules/spatial.py`. `frame_shape` is `(height, width)`. Return
-`(danger_score, reason)`, where the score is in `[0, 1]` and the reason explains
-the risk. Define proximity calculations and behaviour when children, hazards,
-or bounding boxes are missing. Image distance alone is not physical distance.
-
-Agree on class labels and how children are identified before integration.
-A person detection alone does not identify a child. Detection confidence and
-danger score are separate values.
-
-**Shared:** `SafetyClassifier` already connects these interfaces and converts
-the score to `SAFE`, `LOW`, `MEDIUM`, or `HIGH`. The UI continues to call
-`predict(frame_bgr) -> ClassificationResult`, containing `level`, `score`,
-`detections`, and `reason`.
-
-`get_classifier()` in `modules/classifier.py` picks the pipeline:
-`HazardSpatialClassifier` (trained hazards + person + depth + spatial) when the
-trained weights are found, otherwise `SpatialDemoClassifier`. `DummyClassifier`
-remains the labelled fallback if model loading fails. The notebook's
-`medicine_syrup` class is renamed to `liquid_medicine` so it gets its spatial
-danger weight. Use the **Test Image** / **Test Video** tabs to check boxes,
-scores, and explanations. Tests:
-`python -m pytest modules/tests/test_depth_logic.py modules/tests/test_hazard_pipeline.py -q`.
-
-## Telegram alerts
-
-Create `.streamlit/secrets.toml` (already ignored by Git):
-
-```toml
-TELEGRAM_BOT_TOKEN = "your-bot-token"
-```
-
-How recipients are organised:
-
-```text
-Home (one household, private home key)
- ├─ Rooms:   Living room, Bedroom, ...   <- each camera picks its room in Settings
- └─ Members: Telegram chats that joined with the home's invite link
-             (a parent, or a family group chat)
-```
-
-1. Open the **Telegram** tab and create a home. Its private key is put in the
-   page URL, so bookmark the page (or keep the key) to reopen it.
-2. Add one room per camera location.
-3. Send the invite link to caregivers. One tap joins **all** rooms of the home.
-4. On **Live Monitoring**, under Caregiver alerts, pick this camera's room and
-   switch on **Send Telegram alerts**.
-5. Use **Send test message** / **Send test alert** in the Telegram tab to check delivery.
-
-In Telegram, members can use `/rooms` to mute or unmute single rooms, or leave a
-home, and `/stop` to leave everything. One person can join several homes
-(e.g. their own and a grandparent's) and gets alerts labelled `Home · Room`.
-
-Built for many users:
-- every browser only sees its own home; nobody can see or delete other homes;
-- subscriptions are in SQLite (`subscribers.db`), safe with many users and threads;
-- alerts go through one queue that stays under Telegram's rate limit and retries
-  when Telegram asks to slow down; a photo is uploaded once and re-used for all members;
-- chats that blocked the bot are removed automatically;
-- the alert cooldown is per room and shared, so two open browsers don't double-alert.
-
-With `DummyClassifier`, alerts can be switched on for testing but use random
-scores (set **Level must last** to 0 in Settings to trigger one quickly).
-`.streamlit/config.toml` forces the light theme so text stays readable. Do not commit bot secrets.
-
-## Deployment
-
-WebRTC uses the viewer's browser camera. For Streamlit Community Cloud, point
-the deployment to `app.py` and enter the bot token in App settings -> Secrets.
-Model hosting requirements depend on the selected model. Restrictive networks
-may require a TURN server in `RTC_CONFIG` in `app.py`.
-
-Subscriptions are stored in local `subscribers.db` (SQLite). Hosts that wipe the disk
-on restart (e.g. Streamlit Community Cloud) need persistent storage or a hosted
-database (Postgres/Supabase) behind the same `SubscriptionStore` methods. Only one
-running server may poll the bot; with several servers, switch the bot to a webhook.
+Large datasets, generated image folders and model checkpoints remain outside normal Git tracking. Their locations and access requirements are documented in the [model guide](docs/MODEL_RESULTS.md#artifact-locations-and-verification).

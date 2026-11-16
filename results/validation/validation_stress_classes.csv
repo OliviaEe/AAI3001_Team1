@@ -1,0 +1,43 @@
+Model,Class,mAP50_95
+Baseline: YOLOv8n,battery,0.47189050410441136
+Baseline: YOLOv8n,coin_battery,0.5995943114821082
+Baseline: YOLOv8n,coin,0.6558743542058658
+Baseline: YOLOv8n,small_object,0.580469939281391
+Baseline: YOLOv8n,pen,0.4357902738707341
+Baseline: YOLOv8n,sharp,0.5641928118140389
+Baseline: YOLOv8n,medicine,0.6018413306876278
+Experiment 1: lower learning rate,battery,0.458093182177212
+Experiment 1: lower learning rate,coin_battery,0.5789329468692622
+Experiment 1: lower learning rate,coin,0.641717517015479
+Experiment 1: lower learning rate,small_object,0.5931928419477688
+Experiment 1: lower learning rate,pen,0.4118803099051026
+Experiment 1: lower learning rate,sharp,0.5638800462014698
+Experiment 1: lower learning rate,medicine,0.6206756589075388
+Experiment 2: input size 960,battery,0.4416668545369128
+Experiment 2: input size 960,coin_battery,0.5743171409071606
+Experiment 2: input size 960,coin,0.6380848867508876
+Experiment 2: input size 960,small_object,0.5838934416926338
+Experiment 2: input size 960,pen,0.3727115480470754
+Experiment 2: input size 960,sharp,0.5302293008750687
+Experiment 2: input size 960,medicine,0.6139180727074578
+Experiment 3: YOLOv8s,battery,0.483395401789185
+Experiment 3: YOLOv8s,coin_battery,0.6372183109049244
+Experiment 3: YOLOv8s,coin,0.6873715446764928
+Experiment 3: YOLOv8s,small_object,0.6041605059149882
+Experiment 3: YOLOv8s,pen,0.48494741076868114
+Experiment 3: YOLOv8s,sharp,0.5987612415953613
+Experiment 3: YOLOv8s,medicine,0.6654296942249646
+Experiment 4: YOLOv8s-P2,battery,0.5034435162802684
+Experiment 4: YOLOv8s-P2,coin_battery,0.6176044566870645
+Experiment 4: YOLOv8s-P2,coin,0.677457927675863
+Experiment 4: YOLOv8s-P2,small_object,0.6040115458875107
+Experiment 4: YOLOv8s-P2,pen,0.46070376236827226
+Experiment 4: YOLOv8s-P2,sharp,0.5932125096180165
+Experiment 4: YOLOv8s-P2,medicine,0.6595930958812993
+Experiment 5: YOLOv8s-P2 input size 960,battery,0.4368669201113379
+Experiment 5: YOLOv8s-P2 input size 960,coin_battery,0.5564207005295555
+Experiment 5: YOLOv8s-P2 input size 960,coin,0.6264589398873401
+Experiment 5: YOLOv8s-P2 input size 960,small_object,0.5799851697203512
+Experiment 5: YOLOv8s-P2 input size 960,pen,0.40280126563510416
+Experiment 5: YOLOv8s-P2 input size 960,sharp,0.5351865836604152
+Experiment 5: YOLOv8s-P2 input size 960,medicine,0.6460908774976999

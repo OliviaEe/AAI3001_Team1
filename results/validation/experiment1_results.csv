@@ -1,0 +1,2 @@
+Model,Learning Rate,Input Size,Precision,Recall,mAP50,mAP50-95
+Experiment 1: lower learning rate,0.0001,640,0.866878954300449,0.8343525835233594,0.8921019186882572,0.5835862303080398

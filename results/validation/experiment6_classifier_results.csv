@@ -1,0 +1,2 @@
+Model,Classifier Learning Rate,Crop Size,Validation Accuracy
+Experiment 6: crop classifier,0.001,96,0.9663265347480774

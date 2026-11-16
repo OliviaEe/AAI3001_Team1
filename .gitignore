@@ -7,3 +7,18 @@ __pycache__/
 subscribers.db*
 weights/
 .runtime/
+
+# Large model/data artifacts: keep download links and checksums in docs instead.
+*.pt
+*.pth
+*.onnx
+*.zip
+*.partial
+*.kaggle-partial
+.ipynb_checkpoints/
+data/raw/
+data/processed/
+datasets/
+evaluation_images/
+classifier_crops/
+.env.*

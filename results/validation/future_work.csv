@@ -1,0 +1,6 @@
+Issue,Evidence to Review,Next Step
+Small objects are missed,Recall by pixel size and failure examples,Check closer views and representative small-object images
+Incorrect hazard labels,False detections and their confidence scores,Review labels and add correctly labelled confusing scenes
+"Blur, grain or lighting sensitivity",Controlled-condition results,Check the same objects under fixed camera conditions
+Classifier rejects genuine hazards,Additional missed objects in the pipeline comparison,Review rejected proposals before retaining the classifier
+Camera delay or unclear video,Full-application measurements,Measure capture quality and end-to-end latency separately

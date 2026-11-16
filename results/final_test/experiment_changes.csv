@@ -1,0 +1,6 @@
+Factor,Experiment,Reference,Validation Change (pp),Validation Stress Change (pp),Test Change (pp),Test Stress Change (pp)
+Learning rate,Experiment 1: lower learning rate,Baseline: YOLOv8n,-1.9628424185840876,-0.5897288917477539,-0.5603898582454914,-0.9708873094029458
+YOLOv8n input resolution,Experiment 2: input size 960,Baseline: YOLOv8n,-11.23486070104276,-2.2118897132711535,-11.5914252572144,-2.251784176858107
+Model capacity,Experiment 3: YOLOv8s,Baseline: YOLOv8n,4.0881365515100025,3.594722634691716,4.965455596848544,4.178607261227818
+P2 architecture,Experiment 4: YOLOv8s-P2,Experiment 3: YOLOv8s,-1.6218504211664375,-0.646532792518606,-1.6637393223957408,-1.5055958621655097
+P2 input resolution,Experiment 5: YOLOv8s-P2 input size 960,Experiment 4: YOLOv8s-P2,-10.307539504024533,-4.745947962235597,-11.891446020260698,-4.1162353162886856

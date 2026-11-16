@@ -1,0 +1,451 @@
+{
+  "root_notebook": {
+    "path": "Child_Safety_Hazard_Detection_YOLOv8.ipynb",
+    "sha256": "efc11fcc46115bcfe4d087eae33ac451435313cbd28ac3b4fc1eeb9c134b84ca"
+  },
+  "source_runs": [
+    {
+      "run": "baseline",
+      "kernel": "oliviaee/cvdl-final-baseline-exp1/8",
+      "url": "https://www.kaggle.com/code/oliviaee/cvdl-final-baseline-exp1",
+      "status": "KernelWorkerStatus.CANCEL_ACKNOWLEDGED",
+      "failure_message": "Your notebook was stopped because it exceeded the max allowed execution duration.",
+      "log_characters": 6537495,
+      "kernel_session_id": 369424590
+    },
+    {
+      "run": "exp1",
+      "kernel": "oliviaee/cvdl-final-baseline-exp1/8",
+      "url": "https://www.kaggle.com/code/oliviaee/cvdl-final-baseline-exp1",
+      "status": "KernelWorkerStatus.CANCEL_ACKNOWLEDGED",
+      "failure_message": "Your notebook was stopped because it exceeded the max allowed execution duration.",
+      "log_characters": 6537495,
+      "kernel_session_id": 369424590
+    },
+    {
+      "run": "exp2",
+      "kernel": "oliviaee/cvdl-exp2",
+      "url": "https://www.kaggle.com/code/oliviaee/cvdl-exp2",
+      "status": "KernelWorkerStatus.COMPLETE",
+      "failure_message": "",
+      "log_characters": 2565373,
+      "kernel_session_id": 369806077
+    },
+    {
+      "run": "exp3",
+      "kernel": "oliviaee/cvdl-exp3",
+      "url": "https://www.kaggle.com/code/oliviaee/cvdl-exp3",
+      "status": "KernelWorkerStatus.COMPLETE",
+      "failure_message": "",
+      "log_characters": 2411273,
+      "kernel_session_id": 369806005
+    },
+    {
+      "run": "exp4",
+      "kernel": "tzehui/cvdl-exp4",
+      "url": "https://www.kaggle.com/code/tzehui/cvdl-exp4",
+      "status": "KernelWorkerStatus.COMPLETE",
+      "failure_message": "",
+      "log_characters": 2575244,
+      "kernel_session_id": 369806594
+    },
+    {
+      "run": "exp5",
+      "kernel": "tzehui/cvdl-exp5",
+      "url": "https://www.kaggle.com/code/tzehui/cvdl-exp5",
+      "status": "KernelWorkerStatus.COMPLETE",
+      "failure_message": "",
+      "log_characters": 2576487,
+      "kernel_session_id": 369805769
+    },
+    {
+      "run": "exp6",
+      "kernel": "tzehui/cvdl-final-exp6",
+      "url": "https://www.kaggle.com/code/tzehui/cvdl-final-exp6",
+      "status": "KernelWorkerStatus.COMPLETE",
+      "failure_message": "",
+      "log_characters": 223970,
+      "kernel_session_id": 369909441
+    }
+  ],
+  "final_evaluation": {
+    "kernel": "tzehui/cvdl-final-section-7-10",
+    "status": "COMPLETE",
+    "bundle_dataset": "tzehui/cvdl-output"
+  },
+  "split_counts": {
+    "train": 11996,
+    "val": 2570,
+    "test": 2568
+  },
+  "original_split_manifest_sha256": "d640c8b6277193560323e3146ab969ece34a4f2f2d2508203ca38533893220e0",
+  "checkpoints": [
+    {
+      "filename": "baseline_best.pt",
+      "bytes": 6487274,
+      "sha256": "879a6cb53b4255c15894992b8da41beda0b171acc4d786a68f45c34650fccee4"
+    },
+    {
+      "filename": "experiment1_best.pt",
+      "bytes": 6487274,
+      "sha256": "c322e451a0a8f8bfe26c15a4ae9a0fbea36c064321c745adc6c09ac29c19650a"
+    },
+    {
+      "filename": "experiment2_best.pt",
+      "bytes": 6525866,
+      "sha256": "40307aa92f80a3ac340b43e76c308777d84798994f7ecc569b251cb98a634f1d"
+    },
+    {
+      "filename": "experiment3_best.pt",
+      "bytes": 22502058,
+      "sha256": "ff7b9bbc95e2c44f9b50b85e5d197f91e48f302a7f6f36760b3fb7450d53d5be"
+    },
+    {
+      "filename": "experiment4_best.pt",
+      "bytes": 22077584,
+      "sha256": "ee24315b26666fd5f56870b7284b7bae29bc4d5f009015dbc5a6fd921ca190bb"
+    },
+    {
+      "filename": "experiment5_best.pt",
+      "bytes": 22233744,
+      "sha256": "0475e0e76e615c4948305bea2f033e428df604ca19a0d0f2e766a335ffbf31f9"
+    },
+    {
+      "filename": "experiment6_classifier_best.pt",
+      "bytes": 2980808,
+      "sha256": "fe1520d805923f57c3a28651ec0f1a4301f13f595deda4dee59bedd275a6ead7"
+    },
+    {
+      "filename": "final_best.pt",
+      "bytes": 22502058,
+      "sha256": "ff7b9bbc95e2c44f9b50b85e5d197f91e48f302a7f6f36760b3fb7450d53d5be"
+    }
+  ],
+  "copied_records": [
+    {
+      "path": "configs/model_training/final_model_settings_original.csv",
+      "bytes": 377,
+      "sha256": "89c4986baf7b66e818df0d387bcf97575fa2396430b4496d6504140223ec0476"
+    },
+    {
+      "path": "configs/model_training/selected_detector.json",
+      "bytes": 594,
+      "sha256": "67d942a659e210cabf280d112de5e0d066d213e4f14efa8341f941ced9c1d40a"
+    },
+    {
+      "path": "figures/model_training/evaluation/controlled_condition_comparison.png",
+      "bytes": 122515,
+      "sha256": "b67de8502d43fe1a930f4c75f14afb3855774c82dc6e0490ea2ec8c6c3afff58"
+    },
+    {
+      "path": "figures/model_training/evaluation/detector_pipeline_comparison.png",
+      "bytes": 51720,
+      "sha256": "e623fae295265f9979511582d92d31b1fb48861dec2268c3290d729e5c927f4a"
+    },
+    {
+      "path": "figures/model_training/evaluation/failure_examples_01.png",
+      "bytes": 1715335,
+      "sha256": "8e770aa0392472eafeac0903ccda7f493def02be8010c5d6902005705a6c908e"
+    },
+    {
+      "path": "figures/model_training/evaluation/failure_examples_02.png",
+      "bytes": 1735156,
+      "sha256": "f9eb8803eb853f691cbbf9f6dcece00ae770b6fd5e4c9c204f31168116797d16"
+    },
+    {
+      "path": "figures/model_training/evaluation/final_model_comparison.png",
+      "bytes": 156957,
+      "sha256": "ef135bbf5fbf40cbbdc55f1c28d273321b0edfafb4a293f95743bf7f1a690a29"
+    },
+    {
+      "path": "figures/model_training/evaluation/joint_detector_test_comparison.png",
+      "bytes": 105835,
+      "sha256": "4523acbf925f87e0d98d00347e9917112ab35dd999e7c08cfc1324a80dc55b20"
+    },
+    {
+      "path": "figures/model_training/evaluation/test_class_recall.png",
+      "bytes": 220417,
+      "sha256": "ed82cfd59e012d4db3d9a61dc1112c2e6bdd3a0ddf9846e102a45ca02b030a45"
+    },
+    {
+      "path": "figures/model_training/evaluation/test_pixel_size_recall.png",
+      "bytes": 283098,
+      "sha256": "5b81b825df155df0ae5202bb3e6a3ddca5de242caaa64a8969d3c321f4a409a3"
+    },
+    {
+      "path": "figures/model_training/evaluation/validation_comparison.png",
+      "bytes": 89396,
+      "sha256": "b84f6c4f42a9571c108346b92f45127ef37463dc1774f4f5a34e7396ca709d9d"
+    },
+    {
+      "path": "figures/model_training/evaluation/validation_confidence_tradeoff.png",
+      "bytes": 139400,
+      "sha256": "b46e30c9d723fd83c8657ba9bcb8da0f7a1c5d372be9acf24f3410837970f830"
+    },
+    {
+      "path": "figures/model_training/evaluation/validation_stress_preview.png",
+      "bytes": 3583197,
+      "sha256": "6c8f687e20c7a7add08983c8870743d1b478b435180965d934b46030cdae2770"
+    },
+    {
+      "path": "figures/model_training/training/baseline_results.png",
+      "bytes": 261658,
+      "sha256": "8ea34ff9350cffc07d79b373fca1b26663ea65c5ea9a889548e897088c9b99e4"
+    },
+    {
+      "path": "figures/model_training/training/exp1_results.png",
+      "bytes": 266403,
+      "sha256": "50da8d1cad4a123e48d49f2480422edff9c33f74ee3be51b5633b5b8ce764d14"
+    },
+    {
+      "path": "figures/model_training/training/exp2_results.png",
+      "bytes": 277606,
+      "sha256": "e9ebfb89e3377cd3d14c10f25d0d62da9eec12ede58126746a9627ae0a9dd85c"
+    },
+    {
+      "path": "figures/model_training/training/exp3_results.png",
+      "bytes": 265574,
+      "sha256": "89ef235ae9496f64380c2783b0418025a5bd29114ea4e2a3c5ebd2a4a9ac23ce"
+    },
+    {
+      "path": "figures/model_training/training/exp4_results.png",
+      "bytes": 271393,
+      "sha256": "4ae8bef4c9ca97dc3b45a7cae1abdd83c3493e2bd4dba41e71bac1698c8be0e8"
+    },
+    {
+      "path": "figures/model_training/training/exp5_results.png",
+      "bytes": 277213,
+      "sha256": "878b1f014c571be20890b7a4f0833bc8081fbc484c963541c0497df5a13897f3"
+    },
+    {
+      "path": "figures/model_training/training/exp6_results.png",
+      "bytes": 147853,
+      "sha256": "b32fe69e308d5eb2ab9e9368c54868b54ea89ebab21fc931328fa3974d60dff4"
+    },
+    {
+      "path": "results/model_training/final_test/chosen_detector_operating_point.csv",
+      "bytes": 388,
+      "sha256": "4cb1fdc033a280e06f506098e0c3136df50d0f80a2c3c8a05b8961106d7686dc"
+    },
+    {
+      "path": "results/model_training/final_test/controlled_condition_results.csv",
+      "bytes": 7786,
+      "sha256": "4d671004a88c24e819700d9fdde1c07a361d8f11228999b18f3d56801fd3cbc2"
+    },
+    {
+      "path": "results/model_training/final_test/detector_pipeline_class_metrics.csv",
+      "bytes": 2478,
+      "sha256": "504fc859fcbf3e5143b775f706000eb3c75d61a3d3245a32c985f7964fdfe7db"
+    },
+    {
+      "path": "results/model_training/final_test/detector_pipeline_comparison.csv",
+      "bytes": 702,
+      "sha256": "11afb0aceca8f8585955570f2461cd5b8afedf1a4113ec20db87e3f1becc4e51"
+    },
+    {
+      "path": "results/model_training/final_test/experiment_changes.csv",
+      "bytes": 850,
+      "sha256": "9e1e3c0b110b224118804fbcc3d50e61807af3d8252d5f9bd93eb4bb3986ddc9"
+    },
+    {
+      "path": "results/model_training/final_test/final_classifier_results.csv",
+      "bytes": 119,
+      "sha256": "ebbc996d0aff87ef49d633c8cd711bea8f352773474fed9caac0a807d6802ba2"
+    },
+    {
+      "path": "results/model_training/final_test/final_model_comparison.csv",
+      "bytes": 711,
+      "sha256": "429ec49562192b21fc33d97c2ab70d15c3f61864d07556b321c6159ecc948d4b"
+    },
+    {
+      "path": "results/model_training/final_test/final_pipeline_changes.csv",
+      "bytes": 205,
+      "sha256": "0dc0e82735df6cb674e4aae75158d739f469fa4965d396edbf120c75a34c58d0"
+    },
+    {
+      "path": "results/model_training/final_test/joint_detector_class_metrics.csv",
+      "bytes": 9606,
+      "sha256": "05c5459e54ad30bbd7fecd4a401f4770eb613460472caaa8bec8a0920bc01a10"
+    },
+    {
+      "path": "results/model_training/final_test/joint_detector_metrics.csv",
+      "bytes": 2398,
+      "sha256": "da0bd8e7305bc86ea168cdc29c48e7fe8cb2dbe6311d94b8a0868f6b97b97c3a"
+    },
+    {
+      "path": "results/model_training/final_test/recall_by_pixel_size.csv",
+      "bytes": 3599,
+      "sha256": "fbadd5276a648189465cfdbf9815b86b2e8d68fcbaeaf3e3895ba953492c13a4"
+    },
+    {
+      "path": "results/model_training/final_test/selected_model_classes.csv",
+      "bytes": 1551,
+      "sha256": "9c15ce0001cbc7c9dd21fcaef235ba86c551cbdf81643e113ef729c59051a4fd"
+    },
+    {
+      "path": "results/model_training/final_test/selected_model_conditions.csv",
+      "bytes": 1313,
+      "sha256": "1cd9dd6024a57881c52a326773b323de5ead72e23b493ea83ee3a8a551b64a61"
+    },
+    {
+      "path": "results/model_training/final_test/selected_model_sizes.csv",
+      "bytes": 582,
+      "sha256": "27bb22224d13760e51221a7c7c9279e3f745dfdb70adb528e3ae3c572342fa2c"
+    },
+    {
+      "path": "results/model_training/split_membership.csv",
+      "bytes": 1122461,
+      "sha256": "72f986f82e91dc1edd697c20cc209b2fefe5f0585a95988e11c5719aac5931d4"
+    },
+    {
+      "path": "results/model_training/training_history/baseline/args.yaml",
+      "bytes": 4535,
+      "sha256": "d702b9fa9b36c1f489fb431250d568a032cd1f8b7b7064ea11f32494f2626bba"
+    },
+    {
+      "path": "results/model_training/training_history/baseline/results.csv",
+      "bytes": 5191,
+      "sha256": "f942c0c3ef832785db87eeeb106671dc27bfde67dbb823ae761d996dc09b9a6c"
+    },
+    {
+      "path": "results/model_training/training_history/exp1/args.yaml",
+      "bytes": 4559,
+      "sha256": "32272379f31219081e871dc4ae98dea34c08959840c769e0d3ae288bc33b6912"
+    },
+    {
+      "path": "results/model_training/training_history/exp1/results.csv",
+      "bytes": 5193,
+      "sha256": "ef5d6d733de0ae65d4245e138036ed8645b835507523c47db42f84bc6a2890ef"
+    },
+    {
+      "path": "results/model_training/training_history/exp2/args.yaml",
+      "bytes": 4569,
+      "sha256": "49b525529247319a2de759b44992376ab1e1f9e187bda024fcc9ed9cfb2065c4"
+    },
+    {
+      "path": "results/model_training/training_history/exp2/results.csv",
+      "bytes": 5195,
+      "sha256": "54047e022665a197a194ef9e0a0a03c3f35a9e2d3fd332b31763a769a80f3078"
+    },
+    {
+      "path": "results/model_training/training_history/exp3/args.yaml",
+      "bytes": 4557,
+      "sha256": "06e97e5c73c5fb9c7ecba9e493979723bd96fee47685e5c1aec0bf47dd6a2cc1"
+    },
+    {
+      "path": "results/model_training/training_history/exp3/results.csv",
+      "bytes": 5198,
+      "sha256": "dbb14a4cb03b116b19a4a1669e550af1df6677854d1aa387b824384a6fed4ee3"
+    },
+    {
+      "path": "results/model_training/training_history/exp4/args.yaml",
+      "bytes": 4568,
+      "sha256": "f58a01f93de71a027746d9ebe2d05bea381f6fa06593944a1f75155f5e460f03"
+    },
+    {
+      "path": "results/model_training/training_history/exp4/results.csv",
+      "bytes": 5197,
+      "sha256": "cfaf62ff17dbfed08874028801135885e421315992383f1e79224d4b5d7227c9"
+    },
+    {
+      "path": "results/model_training/training_history/exp5/args.yaml",
+      "bytes": 4576,
+      "sha256": "075fbaa1ea6ab02c164e1b7e144945ef3a061c65e084ef19c40fce3e687b53b3"
+    },
+    {
+      "path": "results/model_training/training_history/exp5/results.csv",
+      "bytes": 5202,
+      "sha256": "7a127d048db33d20a49fc35e59351b088826402e6fdb384cd298cdad8985ece1"
+    },
+    {
+      "path": "results/model_training/training_history/exp6/args.yaml",
+      "bytes": 1770,
+      "sha256": "acffdb298c5135fb03d9b3d6ad05c06d008b3b6bf1caffc13275b9cd511fd638"
+    },
+    {
+      "path": "results/model_training/training_history/exp6/results.csv",
+      "bytes": 2041,
+      "sha256": "d2c3d48e5c927fdc0274f1687420ab571a942ccdf1474f6938ef9265d0e703b5"
+    },
+    {
+      "path": "results/model_training/validation/baseline_results.csv",
+      "bytes": 168,
+      "sha256": "b1a6e2f276a5b5c50dcb73967f204d23df3ae87cc689b63646ebb8ddd5f6c63d"
+    },
+    {
+      "path": "results/model_training/validation/chosen_validation_class_metrics.csv",
+      "bytes": 466,
+      "sha256": "c7530f0314fa8fdbea03e27316b7423968bfe8a058ce148b915e33f35b05a72e"
+    },
+    {
+      "path": "results/model_training/validation/chosen_validation_operating_point.csv",
+      "bytes": 300,
+      "sha256": "3b9eb8d236a6d05a1c86fb8665d9bbfb2a5283edaed1f9d1614f9f036323cb9a"
+    },
+    {
+      "path": "results/model_training/validation/classifier_validation_thresholds.csv",
+      "bytes": 773,
+      "sha256": "ee585cd7217defcb1791276ca0fccc81915edd012d498b2eac283c6824bf022f"
+    },
+    {
+      "path": "results/model_training/validation/experiment1_results.csv",
+      "bytes": 183,
+      "sha256": "b2005d570762637f76bce5563df5cf1418a2649af526fd18654a880c36aee460"
+    },
+    {
+      "path": "results/model_training/validation/experiment2_results.csv",
+      "bytes": 179,
+      "sha256": "65bb10a24ad1195cc0d9c756cb486301ddf4602d08f40c6dd11de2887544fce4"
+    },
+    {
+      "path": "results/model_training/validation/experiment3_results.csv",
+      "bytes": 172,
+      "sha256": "1a125789925937aba92a100c2256037450e2dc9f832e9cfa87e105da0980512c"
+    },
+    {
+      "path": "results/model_training/validation/experiment4_results.csv",
+      "bytes": 174,
+      "sha256": "1987b63b2ebbc13bba5c80fac1c0c7daf1aa864975fd312e6bfaec887cfa6c94"
+    },
+    {
+      "path": "results/model_training/validation/experiment5_results.csv",
+      "bytes": 189,
+      "sha256": "4fecdb199850df922c45d8548d701673800daa67613cf8a63c9e7163032bbc38"
+    },
+    {
+      "path": "results/model_training/validation/experiment6_classifier_classes.csv",
+      "bytes": 753,
+      "sha256": "e0728a2bddf29aa8d7b579a1d630116e8385a87ab382bcc353f6dc029e908f75"
+    },
+    {
+      "path": "results/model_training/validation/experiment6_classifier_results.csv",
+      "bytes": 119,
+      "sha256": "ebbc996d0aff87ef49d633c8cd711bea8f352773474fed9caac0a807d6802ba2"
+    },
+    {
+      "path": "results/model_training/validation/final_model_settings.csv",
+      "bytes": 377,
+      "sha256": "89c4986baf7b66e818df0d387bcf97575fa2396430b4496d6504140223ec0476"
+    },
+    {
+      "path": "results/model_training/validation/future_work.csv",
+      "bytes": 671,
+      "sha256": "d2be3ae45e3ab21912dfae942a5171e9b2d7e0c677e174bff9cd6be3488dca9f"
+    },
+    {
+      "path": "results/model_training/validation/validation_metrics.csv",
+      "bytes": 1049,
+      "sha256": "e7cbf230e6db544758a0749447ad01da5cb4cdd7b2033cd39c087f0823c1258c"
+    },
+    {
+      "path": "results/model_training/validation/validation_stress_classes.csv",
+      "bytes": 2342,
+      "sha256": "8cac20fb7fd4b076ad4fc193d9ef3af3aaefd3454ae65133c1f789f1bec8b046"
+    },
+    {
+      "path": "results/model_training/validation/validation_thresholds.csv",
+      "bytes": 7731,
+      "sha256": "93ae6e9c1c18a3db22c859b84ffa7f1015dfbfad7ee4ed38829ddfa10f243854"
+    }
+  ]
+}
