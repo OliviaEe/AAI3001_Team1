@@ -2,7 +2,7 @@
 
 Streamlit UI for live camera monitoring, image/video testing, and Telegram alerts.
 
-[Project overview](../README.md) · [Model results and limitations](MODEL_RESULTS.md)
+[Project overview](../README.md) · [Model results and limitations](MODEL_RESULTS.md) · [Spatial analysis](SPATIAL_ANALYSIS.md)
 
 **Integration status:** the final trained model has seven hazard groups. The existing spatial risk mapping still contains the older fourteen-class names; integration of the grouped labels needs review before relying on its risk levels. The trained crop classifier from Experiment 6 is not part of the recommended detection configuration.
 
@@ -10,7 +10,7 @@ Full pipeline (`HazardSpatialClassifier`), used when `weights/final_best.pt` exi
 
 ```text
 camera frame -> Tze's trained YOLOv8 (7 hazard groups)  -> hazards  -+
-             -> stock YOLOv8s (COCO "person")             -> person   -+-> SpatialAnalyzer
+             -> stock YOLOv8n (COCO "person")             -> person   -+-> SpatialAnalyzer
              -> Depth Anything V2 (background thread)     -> depth    -+   -> danger level
 ```
 
@@ -20,8 +20,7 @@ app uses the spatial team's stock-YOLO demo (`SpatialDemoClassifier`: person,
 knife and scissors only). The Live page shows which one is running, and a
 model that fails to load is shown as an error with demo mode.
 
-`weights/yolov8s.pt` (person model) downloads automatically on first run, and so
-does the depth model (needs `transformers` and internet once). A person stands
+`weights/yolov8n.pt` is the person model used in the trained-hazard path; the stock-only demo uses `weights/yolov8s.pt`. Missing stock weights download on first use, as does the depth model (requires `transformers` and internet for initial setup). A person stands
 in for the child reference; this model does not identify age.
 
 The UI owns one browser camera stream; it imports the demo's helper functions
@@ -33,8 +32,7 @@ was added.
 
 CPU depth can take several seconds. The proximity panel shows the map's age;
 video and detection can stay live while depth-based distance updates lag behind.
-Observed map ages ranged from approximately 5–15 seconds, so current boxes may
-be assessed against older depth data. Duplicate detections and live proximity
+Earlier UI notes recorded map ages of approximately 5–15 seconds. In the current implementation, maps older than **1.5 seconds** are excluded from proximity scoring and the app falls back to image-plane distance. The old map can remain visible with its age; this does not mean it is used for assessment. A usable map can still describe an earlier frame within the freshness window. See the [live timing explanation](SPATIAL_ANALYSIS.md#live-timing-fallback-and-score-persistence). Duplicate detections and live proximity
 accuracy still need model/pipeline validation; functional UI integration does
 not establish that a displayed SAFE level describes the current scene accurately.
 Distinguish this timing limitation from the spatial risk formula when refining

@@ -8,7 +8,10 @@ A team computer-vision prototype combining hazard detection, a person reference,
 |---|---|
 | [UI and application guide](docs/UI_GUIDE.md) | Installation, camera controls, image/video testing, spatial/depth integration, Telegram and deployment |
 | [Model experiments, results and limitations](docs/MODEL_RESULTS.md) | Baseline and six experiments, evaluation protocol, selected configuration, findings, limitations, future work and artifact records |
+| [Spatial analysis and integration](docs/SPATIAL_ANALYSIS.md) | Relative box distance, depth sampling, risk formula, temporal handling, tests and seven-class integration gap |
 | [Executed notebook](Child_Safety_Hazard_Detection_YOLOv8.ipynb) | Full preparation/training/evaluation code and recorded outputs |
+
+> **Reading the report on GitHub:** the executed notebook is approximately 38 MB and may be too large for GitHub's notebook preview. The [model guide](docs/MODEL_RESULTS.md) is written to stand alone, with readable result tables and figures. Download the notebook and open it in Jupyter or VS Code if you need the full executed cells.
 
 ## Selected hazard detector
 
@@ -26,7 +29,7 @@ Camera/image/video -> trained hazard detector ----+
 
 The person detector does not establish age. Relative proximity is not a distance measurement in metres, and absence of detections is not proof of safety.
 
-**Integration work remains:** the selected model outputs seven hazard groups, while the current app spatial weights still use the legacy fourteen-class labels. The mapping for `small_object`, `sharp`, `medicine`, and the merged `pen` group must be reviewed. Model evaluation does not validate the complete live camera/depth/alert pipeline. App code is unchanged by this documentation update.
+**Integration work remains:** the selected model outputs seven hazard groups, while the current app spatial weights still use the legacy fourteen-class labels. The spatial filter currently excludes `small_object`, `sharp` and `medicine`; the merged `pen` group retains the old pen weight. See the [spatial integration gap](docs/SPATIAL_ANALYSIS.md#seven-class-integration-gap) before relying on risk levels. Model evaluation does not validate the complete live camera/depth/alert pipeline. App code is unchanged by this documentation update.
 
 ## Quick start
 
@@ -40,10 +43,10 @@ Obtain the selected checkpoint separately and place it at `weights/final_best.pt
 
 ## Experiment records in this repository
 
-- `results/model_training/validation/`: recorded validation scores and threshold sweeps.
-- `results/model_training/final_test/`: detector, pipeline, class, size and controlled-condition CSV results.
-- `results/model_training/training_history/`: original epoch histories and run arguments for the completed baseline and Experiments 1–6.
-- `results/model_training/split_membership.csv`: exported filenames, categories, photo groups and split assignments; no image files.
+- `results/validation/`: recorded validation scores and threshold sweeps.
+- `results/final_test/`: detector, pipeline, class, size and controlled-condition CSV results.
+- `results/training_history/`: original epoch histories and run arguments for the completed baseline and Experiments 1–6.
+- `results/split_membership.csv`: exported filenames, categories, photo groups and split assignments; no image files.
 - `figures/model_training/`: selected evaluation and training figures.
 - `configs/model_training/selected_detector.json`: recommended settings and seven-class mapping. This is a record, not an automatically loaded app configuration.
 - `configs/model_training/artifact_manifest.json`: source runs, checkpoint hashes, notebook hash and copied-record checksums.
