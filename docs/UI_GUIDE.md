@@ -56,16 +56,21 @@ The combined training report records separate Kaggle runs. Its saved outputs can
 
 ## Files and ownership
 
-| File | Purpose | Owners |
-|---|---|---|
-| `app.py` | Improved UI, camera controls, four status cards, image & video tester, Telegram setup, Settings, and alert history | Liv & Ren |
-| `modules/camera.py` | Browser camera frames, background inference, overlays, and video analysis | Liv & Ren |
-| `modules/notifier.py` | Telegram send queue (rate limits, photo reuse) and per-room cooldown | Liv & Ren |
-| `modules/subscriptions.py` | Homes, rooms, members (SQLite) and bot commands | Liv & Ren |
-| `modules/detector.py` | `YOLODetector` for the trained hazard model; finds `final_best.pt` | Tze |
-| `modules/spatial.py` | Spatial interface and proximity/risk calculation | Ayumi & Nic |
-| `modules/classifier.py` | Shared result types and pipeline integration | Shared |
-| `Child_Safety_Hazard_Detection_YOLOv8.ipynb` | Augmentation, training, and evaluation | Tze |
+<table align="center">
+  <thead>
+    <tr><th align="center">File</th><th align="center">Purpose</th><th align="center">Owners</th></tr>
+  </thead>
+  <tbody>
+    <tr><td align="center"><code>app.py</code></td><td align="center">Improved UI, camera controls, four status cards, image &amp; video tester, Telegram setup, Settings, and alert history</td><td align="center">Liv &amp; Ren</td></tr>
+    <tr><td align="center"><code>modules/camera.py</code></td><td align="center">Browser camera frames, background inference, overlays, and video analysis</td><td align="center">Liv &amp; Ren</td></tr>
+    <tr><td align="center"><code>modules/notifier.py</code></td><td align="center">Telegram send queue (rate limits, photo reuse) and per-room cooldown</td><td align="center">Liv &amp; Ren</td></tr>
+    <tr><td align="center"><code>modules/subscriptions.py</code></td><td align="center">Homes, rooms, members (SQLite) and bot commands</td><td align="center">Liv &amp; Ren</td></tr>
+    <tr><td align="center"><code>modules/detector.py</code></td><td align="center"><code>YOLODetector</code> for the trained hazard model; finds <code>final_best.pt</code></td><td align="center">Tze</td></tr>
+    <tr><td align="center"><code>modules/spatial.py</code></td><td align="center">Spatial interface and proximity/risk calculation</td><td align="center">Ayumi &amp; Nic</td></tr>
+    <tr><td align="center"><code>modules/classifier.py</code></td><td align="center">Shared result types and pipeline integration</td><td align="center">Shared</td></tr>
+    <tr><td align="center"><code>Child_Safety_Hazard_Detection_YOLOv8.ipynb</code></td><td align="center">Augmentation, training, and evaluation</td><td align="center">Tze</td></tr>
+  </tbody>
+</table>
 
 ## Integration
 

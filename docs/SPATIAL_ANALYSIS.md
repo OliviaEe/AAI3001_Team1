@@ -26,14 +26,19 @@ flowchart LR
     T --> U[UI assessment and configured alerts]
 ```
 
-| Source | Responsibility |
-|---|---|
-| [`modules/detector.py`](../modules/detector.py) | Load the trained checkpoint and produce hazard boxes with model class names; default hazard confidence 0.30 |
-| [`modules/classifier.py`](../modules/classifier.py) | Combine trained hazard and stock person detections; call spatial analysis; map score to UI level |
-| [`modules/depth_estimator.py`](../modules/depth_estimator.py) | Run Depth Anything V2 Small, sample object regions and normalise relative depth |
-| [`modules/spatial_pipeline.py`](../modules/spatial_pipeline.py) | Shared detection conversion, demo/person thresholds and maximum live-depth age |
-| [`modules/spatial.py`](../modules/spatial.py) | Pairwise distance, depth adjustment, hazard weights, proximity zones, raw risk score and score hold |
-| [`app.py`](../app.py), `TimedClassifier` | Background live depth, freshness fallback and temporal display behaviour |
+<table align="center">
+  <thead>
+    <tr><th align="center">Source</th><th align="center">Responsibility</th></tr>
+  </thead>
+  <tbody>
+    <tr><td align="center"><a href="../modules/detector.py"><code>modules/detector.py</code></a></td><td align="center">Load the trained checkpoint and produce hazard boxes with model class names; default hazard confidence 0.30</td></tr>
+    <tr><td align="center"><a href="../modules/classifier.py"><code>modules/classifier.py</code></a></td><td align="center">Combine trained hazard and stock person detections; call spatial analysis; map score to UI level</td></tr>
+    <tr><td align="center"><a href="../modules/depth_estimator.py"><code>modules/depth_estimator.py</code></a></td><td align="center">Run Depth Anything V2 Small, sample object regions and normalise relative depth</td></tr>
+    <tr><td align="center"><a href="../modules/spatial_pipeline.py"><code>modules/spatial_pipeline.py</code></a></td><td align="center">Shared detection conversion, demo/person thresholds and maximum live-depth age</td></tr>
+    <tr><td align="center"><a href="../modules/spatial.py"><code>modules/spatial.py</code></a></td><td align="center">Pairwise distance, depth adjustment, hazard weights, proximity zones, raw risk score and score hold</td></tr>
+    <tr><td align="center"><a href="../app.py"><code>app.py</code></a>, <code>TimedClassifier</code></td><td align="center">Background live depth, freshness fallback and temporal display behaviour</td></tr>
+  </tbody>
+</table>
 
 The class name `HazardSpatialClassifier` refers to app integration; it is **not the Experiment 6 crop classifier**. The recommended trained-model configuration uses Exp3 alone for hazard detection, with the separate person/depth/spatial components still available.
 
@@ -91,19 +96,29 @@ The returned raw score is rounded to three decimals. Confidence controls which d
 
 There are two distinct classifications:
 
-| Effective distance (person-box heights) | Geometric zone used in explanation |
-|---|---|
-| Less than 0.5 | CRITICAL |
-| 0.5 to below 1.5 | WARNING |
-| 1.5 to below 3.0 | CAUTION |
-| 3.0 or more | SAFE / zero proximity |
+<table align="center">
+  <thead>
+    <tr><th align="center">Effective distance (person-box heights)</th><th align="center">Geometric zone used in explanation</th></tr>
+  </thead>
+  <tbody>
+    <tr><td align="center">Less than 0.5</td><td align="center">CRITICAL</td></tr>
+    <tr><td align="center">0.5 to below 1.5</td><td align="center">WARNING</td></tr>
+    <tr><td align="center">1.5 to below 3.0</td><td align="center">CAUTION</td></tr>
+    <tr><td align="center">3.0 or more</td><td align="center">SAFE / zero proximity</td></tr>
+  </tbody>
+</table>
 
-| Score | UI assessment level |
-|---|---|
-| Below 0.25 | SAFE |
-| 0.25 to below 0.50 | LOW |
-| 0.50 to below 0.75 | MEDIUM |
-| 0.75 or above | HIGH |
+<table align="center">
+  <thead>
+    <tr><th align="center">Score</th><th align="center">UI assessment level</th></tr>
+  </thead>
+  <tbody>
+    <tr><td align="center">Below 0.25</td><td align="center">SAFE</td></tr>
+    <tr><td align="center">0.25 to below 0.50</td><td align="center">LOW</td></tr>
+    <tr><td align="center">0.50 to below 0.75</td><td align="center">MEDIUM</td></tr>
+    <tr><td align="center">0.75 or above</td><td align="center">HIGH</td></tr>
+  </tbody>
+</table>
 
 A geometric CRITICAL zone does not automatically imply HIGH: score also depends on hazard weight. For example, a coin battery with weight 1.0 at effective distance 0.20 gives approximately 0.933 and HIGH; a recognised `pen` with weight 0.30 at zero separation gives 0.30 and LOW. These are illustrative calculations from the formula, not observed camera-test results. The low pen weight is especially problematic when the final model's `pen` group also includes pen caps.
 
@@ -121,15 +136,20 @@ Live scores rise immediately but persist through brief drops using a **one-secon
 
 **This is a current implementation gap, not only a documentation mismatch.** The selected checkpoint outputs seven groups, while `DANGER_WEIGHTS` contains the original fine-grained hazard names. `SpatialAnalyzer.assess()` filters hazards to that dictionary before applying weights. Therefore the default weight does not automatically cover an unrecognised group.
 
-| Final detector label | Current spatial handling | Consequence |
-|---|---|---|
-| `battery` | Recognised; weight 0.85 | Included in pairwise scoring |
-| `coin_battery` | Recognised; weight 1.0 | Included |
-| `coin` | Recognised; weight 0.8 | Included |
-| `pen` | Recognised; weight 0.3 | Included, but same low weight now covers pen caps |
-| `small_object` | Not in dictionary | Excluded from spatial hazard scoring |
-| `sharp` | Not in dictionary | Excluded from spatial hazard scoring |
-| `medicine` | Not in dictionary | Excluded from spatial hazard scoring |
+<table align="center">
+  <thead>
+    <tr><th align="center">Final detector label</th><th align="center">Current spatial handling</th><th align="center">Consequence</th></tr>
+  </thead>
+  <tbody>
+    <tr><td align="center"><code>battery</code></td><td align="center">Recognised; weight 0.85</td><td align="center">Included in pairwise scoring</td></tr>
+    <tr><td align="center"><code>coin_battery</code></td><td align="center">Recognised; weight 1.0</td><td align="center">Included</td></tr>
+    <tr><td align="center"><code>coin</code></td><td align="center">Recognised; weight 0.8</td><td align="center">Included</td></tr>
+    <tr><td align="center"><code>pen</code></td><td align="center">Recognised; weight 0.3</td><td align="center">Included, but same low weight now covers pen caps</td></tr>
+    <tr><td align="center"><code>small_object</code></td><td align="center">Not in dictionary</td><td align="center">Excluded from spatial hazard scoring</td></tr>
+    <tr><td align="center"><code>sharp</code></td><td align="center">Not in dictionary</td><td align="center">Excluded from spatial hazard scoring</td></tr>
+    <tr><td align="center"><code>medicine</code></td><td align="center">Not in dictionary</td><td align="center">Excluded from spatial hazard scoring</td></tr>
+  </tbody>
+</table>
 
 The existing `medicine_syrup -> liquid_medicine` alias handles an older fine-grained label, not the final `medicine` group. UI hazard-presence checks also use the dictionary, so grouped labels can be present in detector outputs without being treated as recognised hazards downstream.
 
@@ -137,12 +157,17 @@ Before relying on the trained pipeline, the team must agree on group-level risk 
 
 ## Existing checks and what they do not establish
 
-| Record | Coverage visible in source |
-|---|---|
-| [`test_hazard_pipeline.py`](../modules/tests/test_hazard_pipeline.py) | Stand-in detector/person outputs, near/far behaviour, absent person, depth differences |
-| [`test_depth_logic.py`](../modules/tests/test_depth_logic.py) | Controlled depth cases, fallback, multi-person pairing and foreground-held-object behaviour |
-| [`test_distance_demo.py`](../modules/tests/test_distance_demo.py) | Manual geometry examples and a direct analyzer example |
-| [`live_spatial_test.py`](../modules/tests/live_spatial_test.py) | Interactive spatial/depth diagnostic script |
+<table align="center">
+  <thead>
+    <tr><th align="center">Record</th><th align="center">Coverage visible in source</th></tr>
+  </thead>
+  <tbody>
+    <tr><td align="center"><a href="../modules/tests/test_hazard_pipeline.py"><code>test_hazard_pipeline.py</code></a></td><td align="center">Stand-in detector/person outputs, near/far behaviour, absent person, depth differences</td></tr>
+    <tr><td align="center"><a href="../modules/tests/test_depth_logic.py"><code>test_depth_logic.py</code></a></td><td align="center">Controlled depth cases, fallback, multi-person pairing and foreground-held-object behaviour</td></tr>
+    <tr><td align="center"><a href="../modules/tests/test_distance_demo.py"><code>test_distance_demo.py</code></a></td><td align="center">Manual geometry examples and a direct analyzer example</td></tr>
+    <tr><td align="center"><a href="../modules/tests/live_spatial_test.py"><code>live_spatial_test.py</code></a></td><td align="center">Interactive spatial/depth diagnostic script</td></tr>
+  </tbody>
+</table>
 
 These sources show the intended logical checks. They do not provide a labelled real-world spatial benchmark, calibrated centimetre error, reachability accuracy or missed/false-alert rate. Their presence is not a fresh passing test result; tests were not rerun for this documentation-only update. The stand-in hazard tests include legacy labels and do not establish complete seven-group integration.
 

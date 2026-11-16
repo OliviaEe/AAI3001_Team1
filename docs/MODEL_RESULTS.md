@@ -284,25 +284,9 @@ The baseline source session was stopped after completing baseline and Exp1; its 
 
 ## Artifact locations and verification
 
-<table align="center">
-  <thead>
-    <tr><th align="center">Artifact</th><th align="center">Location / record</th></tr>
-  </thead>
-  <tbody>
-    <tr><td align="center">Baseline + Exp1</td><td align="center"><a href="https://www.kaggle.com/code/oliviaee/cvdl-final-baseline-exp1">Kaggle baseline notebook, version 8</a> — manifest records version 8 and session 369424590</td></tr>
-    <tr><td align="center">Exp2</td><td align="center"><a href="https://www.kaggle.com/code/oliviaee/cvdl-exp2">Kaggle Exp2</a></td></tr>
-    <tr><td align="center">Exp3</td><td align="center"><a href="https://www.kaggle.com/code/oliviaee/cvdl-exp3">Kaggle Exp3</a></td></tr>
-    <tr><td align="center">Exp4</td><td align="center"><a href="https://www.kaggle.com/code/tzehui/cvdl-exp4">Kaggle Exp4</a></td></tr>
-    <tr><td align="center">Exp5</td><td align="center"><a href="https://www.kaggle.com/code/tzehui/cvdl-exp5">Kaggle Exp5</a></td></tr>
-    <tr><td align="center">Exp6</td><td align="center"><a href="https://www.kaggle.com/code/tzehui/cvdl-final-exp6">Kaggle Exp6</a></td></tr>
-    <tr><td align="center">Final evaluation</td><td align="center"><a href="https://www.kaggle.com/code/tzehui/cvdl-final-section-7-10">Kaggle Sections 7–10</a></td></tr>
-    <tr><td align="center">Evaluation input</td><td align="center">Private Kaggle Dataset <code>tzehui/cvdl-output</code>; bundle root <code>CVDL_Final_Evaluation_Bundle</code></td></tr>
-    <tr><td align="center">Selected checkpoint</td><td align="center">Final evaluation output: <code>CVDL_Final_Evaluation/models/final_best.pt</code>; copy locally to <code>weights/final_best.pt</code></td></tr>
-    <tr><td align="center">Full failure records and images</td><td align="center">Original final evaluation output, including <code>object_outcomes.csv</code>, <code>metrics/</code> and <code>evaluation_images/</code></td></tr>
-  </tbody>
-</table>
+The repository contains the result tables, figures, training histories and split record needed to follow the documented findings. Full datasets and model checkpoints are stored separately. Obtain the selected checkpoint from the team and place it at weights/final_best.pt; source-session records and checkpoint checksums remain in the [artifact manifest](../configs/model_training/artifact_manifest.json).
 
-Kaggle pages/datasets may require author-granted access. Page URLs can advance to newer versions; compare source-session records and SHA-256 checksums in the manifest rather than assuming the latest output is identical. Models and datasets are not uploaded by this change. Source image URLs/licences and earlier V2/V3 report citations are not fully supplied in the notebook and still need attribution before final submission.
+Original public-image sources and earlier V2/V3 report citations still require attribution before final submission.
 
 To verify a downloaded model on Windows:
 
