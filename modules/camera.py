@@ -18,6 +18,7 @@ from __future__ import annotations
 import io
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
 
 import av
@@ -27,6 +28,35 @@ from streamlit_webrtc import VideoProcessorBase
 
 from modules.classifier import BaseClassifier, ClassificationResult
 from modules.spatial import CHILD_LABELS
+
+MAX_CANDIDATES = 10        # most analysed frames kept for best-frame selection
+
+
+@dataclass
+class Candidate:
+    """One analysed live frame, kept so the UI can pick the best of several."""
+    t: float                                   # time.monotonic() when the result finished
+    frame: np.ndarray                          # BGR image the model saw
+    result: ClassificationResult
+
+
+def frame_quality(result: ClassificationResult) -> tuple:
+    """Sort key for "which frame is the better final result".
+
+    Highest danger score first (a safety monitor should report the worst case it
+    saw), then the most confident detections, then the most objects found.
+    """
+    confs = [d.confidence for d in result.detections]
+    return (result.score, sum(confs) / len(confs) if confs else 0.0, len(confs))
+
+
+def pick_best(candidates: list[Candidate]) -> Candidate | None:
+    """Best candidate; on a tie the newest one wins."""
+    best = None
+    for c in candidates:
+        if best is None or frame_quality(c.result) >= frame_quality(best.result):
+            best = c
+    return best
 
 
 def draw_result(img, result: ClassificationResult, banner: bool = True):
@@ -65,6 +95,7 @@ class CameraProcessor(VideoProcessorBase):
         self._frame_id = 0
         self._latest_frame = None             # newest frame as BGR numpy (shared across threads)
         self._latest_result: ClassificationResult | None = None
+        self._candidates: deque[Candidate] = deque(maxlen=MAX_CANDIDATES)
         self.infer_fps = 0.0                  # measured model runs per second
         self.latency_ms = 0.0                 # time of the last predict() call
         self.error: str | None = None         # last exception from the model, shown in the UI
@@ -82,6 +113,13 @@ class CameraProcessor(VideoProcessorBase):
         """Newest frame as a BGR numpy image."""
         with self._lock:
             return None if self._latest_frame is None else self._latest_frame.copy()
+
+    def recent_candidates(self, n: int, max_age: float = 5.0) -> list[Candidate]:
+        """Up to the last `n` analysed frames (oldest first), skipping stale ones."""
+        cutoff = time.monotonic() - max_age
+        with self._lock:
+            items = list(self._candidates)[-max(n, 1):]
+        return [c for c in items if c.t >= cutoff]
 
     # ---- called by webrtc for every frame (runs in a worker thread) ----
     def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
@@ -121,6 +159,8 @@ class CameraProcessor(VideoProcessorBase):
                 continue
             with self._lock:
                 self._latest_result = result
+                # recv() replaces _latest_frame with a new array, so keeping a reference is safe.
+                self._candidates.append(Candidate(time.monotonic(), frame, result))
             last_id = fid
 
             now = time.perf_counter()
