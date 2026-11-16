@@ -16,6 +16,7 @@ This is the standalone technical account of the model work: the problem, experim
 - [Failure analysis and practical consequences](#failure-analysis-and-practical-consequences)
 - [Findings and limitations](#findings-and-limitations)
 - [Future work and application handoff](#future-work-and-application-handoff)
+- [Conclusion](#conclusion)
 - [Reproduction and records](#reproduction-and-records)
 - [Artifact locations and verification](#artifact-locations-and-verification)
 
@@ -28,6 +29,27 @@ The model study addresses a specific question: **which tested configuration give
 ### Why seven hazard groups
 
 The fourteen original labels are consolidated into groups that match the application's intended outputs: batteries, coin batteries, coins, small objects, pens/pen caps, sharp objects and medicines. Grouping reduces the number of fine-grained distinctions the final model is asked to make, but the rerun does not contain a controlled fourteen-versus-seven-class experiment. It must therefore be described as an output-design choice, not a demonstrated accuracy improvement.
+
+
+
+The table lists the original annotation IDs and their final detector IDs. IDs are reassigned during export; the model's seven-class order must be preserved by downstream code.
+
+<table align="center">
+  <thead>
+    <tr><th align="center">Before: original ID and label</th><th align="center">After: final ID</th><th align="center">After: hazard-group label</th><th align="center">Meaning retained by the output</th></tr>
+  </thead>
+  <tbody>
+    <tr><td align="center"><code>0 battery</code></td><td align="center">0</td><td align="center"><code>battery</code></td><td align="center">Standard battery group</td></tr>
+    <tr><td align="center"><code>1 coin_battery</code></td><td align="center">1</td><td align="center"><code>coin_battery</code></td><td align="center">Coin/button battery group</td></tr>
+    <tr><td align="center"><code>3 coin</code></td><td align="center">2</td><td align="center"><code>coin</code></td><td align="center">Coin group</td></tr>
+    <tr><td align="center"><code>2 bottlecap</code>, <code>4 dice</code>, <code>5 marble</code>, <code>6 small_toy</code></td><td align="center">3</td><td align="center"><code>small_object</code></td><td align="center">Shared small-object group; original item type is not predicted</td></tr>
+    <tr><td align="center"><code>7 pen</code>, <code>8 pencap</code></td><td align="center">4</td><td align="center"><code>pen</code></td><td align="center">Pen and pen cap combined</td></tr>
+    <tr><td align="center"><code>9 knife</code>, <code>10 scissors</code></td><td align="center">5</td><td align="center"><code>sharp</code></td><td align="center">Shared sharp-object group</td></tr>
+    <tr><td align="center"><code>11 medicine_syrup</code>, <code>12 pill_bottle</code>, <code>13 pill_packet</code></td><td align="center">6</td><td align="center"><code>medicine</code></td><td align="center">Shared medicine group</td></tr>
+  </tbody>
+</table>
+
+**What changes:** the exported class IDs and class names. This mapping step does not itself change box coordinates or manually correct missing/incorrect annotations. The original source labels remain separate from the prepared seven-class export.
 
 Grouping also loses information. A `sharp` prediction cannot identify whether the original item was a knife or scissors, and `pen` cannot distinguish a pen body from a pen cap. Downstream risk policies need group-level decisions rather than assuming the original fine-grained label can be reconstructed.
 
@@ -47,15 +69,20 @@ The source annotations have fourteen classes, mapped to seven hazard groups: `ba
 
 All six detectors use the same prepared data, balancing-plus-extras recipe and augmentation strengths. Training uses AdamW, a cosine schedule, seed 42, batch 8, maximum 40 epochs and patience 15. The baseline learning rate is 0.0005. The balanced training recipe contains 12,352 original-image entries (including repetitions), 600 background images and 1,500 object-paste images. Repetitions are not new independent images.
 
-| Run | Main change | Input | Primary reference |
-|---|---|---:|---|
-| Baseline | YOLOv8n, learning rate 0.0005 | 640 | Reference |
-| Exp1 | Learning rate 0.0001 | 640 | Baseline |
-| Exp2 | YOLOv8n at higher resolution | 960 | Baseline |
-| Exp3 | Larger YOLOv8s model | 640 | Baseline |
-| Exp4 | YOLOv8s-P2 finer prediction grid | 640 | Exp3 |
-| Exp5 | Higher-resolution YOLOv8s-P2 | 960 | Exp4 |
-| Exp6 | YOLOv8n crop classifier, learning rate 0.001, 25 epochs | 96-pixel crops | Selected detector alone versus detector + classifier |
+<table align="center">
+  <thead>
+    <tr><th align="center">Run</th><th align="center">Main change</th><th align="center">Input</th><th align="center">Primary reference</th></tr>
+  </thead>
+  <tbody>
+    <tr><td align="center">Baseline</td><td align="center">YOLOv8n, learning rate 0.0005</td><td align="center">640</td><td align="center">Reference</td></tr>
+    <tr><td align="center">Exp1</td><td align="center">Learning rate 0.0001</td><td align="center">640</td><td align="center">Baseline</td></tr>
+    <tr><td align="center">Exp2</td><td align="center">YOLOv8n at higher resolution</td><td align="center">960</td><td align="center">Baseline</td></tr>
+    <tr><td align="center">Exp3</td><td align="center">Larger YOLOv8s model</td><td align="center">640</td><td align="center">Baseline</td></tr>
+    <tr><td align="center">Exp4</td><td align="center">YOLOv8s-P2 finer prediction grid</td><td align="center">640</td><td align="center">Exp3</td></tr>
+    <tr><td align="center">Exp5</td><td align="center">Higher-resolution YOLOv8s-P2</td><td align="center">960</td><td align="center">Exp4</td></tr>
+    <tr><td align="center">Exp6</td><td align="center">YOLOv8n crop classifier, learning rate 0.001, 25 epochs</td><td align="center">96-pixel crops</td><td align="center">Selected detector alone versus detector + classifier</td></tr>
+  </tbody>
+</table>
 
 P2 uses compatible pretrained-weight transfer and has additional layers requiring training. Comparisons assess the implemented configurations under the shared budget, not architecture in isolation.
 
@@ -65,14 +92,19 @@ P2 uses compatible pretrained-weight transfer and has additional layers requirin
 
 All numbers below are **mAP@50–95**, higher is better.
 
-| Model | Validation | Validation stress | Test | Test stress |
-|---|---:|---:|---:|---:|
-| Baseline | 0.6032 | 0.5585 | 0.6052 | 0.5662 |
-| Exp1 | 0.5836 | 0.5526 | 0.5996 | 0.5565 |
-| Exp2 | 0.4909 | 0.5364 | 0.4893 | 0.5437 |
-| **Exp3** | **0.6441** | **0.5945** | **0.6549** | **0.6080** |
-| Exp4 | 0.6279 | 0.5880 | 0.6382 | 0.5929 |
-| Exp5 | 0.5248 | 0.5405 | 0.5193 | 0.5518 |
+<table align="center">
+  <thead>
+    <tr><th align="center">Model</th><th align="center">Validation</th><th align="center">Validation stress</th><th align="center">Test</th><th align="center">Test stress</th></tr>
+  </thead>
+  <tbody>
+    <tr><td align="center">Baseline</td><td align="center">0.6032</td><td align="center">0.5585</td><td align="center">0.6052</td><td align="center">0.5662</td></tr>
+    <tr><td align="center">Exp1</td><td align="center">0.5836</td><td align="center">0.5526</td><td align="center">0.5996</td><td align="center">0.5565</td></tr>
+    <tr><td align="center">Exp2</td><td align="center">0.4909</td><td align="center">0.5364</td><td align="center">0.4893</td><td align="center">0.5437</td></tr>
+    <tr><td align="center"><strong>Exp3</strong></td><td align="center"><strong>0.6441</strong></td><td align="center"><strong>0.5945</strong></td><td align="center"><strong>0.6549</strong></td><td align="center"><strong>0.6080</strong></td></tr>
+    <tr><td align="center">Exp4</td><td align="center">0.6279</td><td align="center">0.5880</td><td align="center">0.6382</td><td align="center">0.5929</td></tr>
+    <tr><td align="center">Exp5</td><td align="center">0.5248</td><td align="center">0.5405</td><td align="center">0.5193</td><td align="center">0.5518</td></tr>
+  </tbody>
+</table>
 
 Source: [final model comparison](../results/final_test/final_model_comparison.csv). Increasing model capacity is the only tested change improving this metric against its intended reference across all four sets. Exp3's clean-test gain over baseline is **4.97 percentage points**. P2 at 640 is second-best overall; higher resolution and lower learning rate do not improve aggregate mAP under this recipe.
 
@@ -112,12 +144,17 @@ The chart visualises the recorded comparison. Some 960-pixel models score higher
 
 The classifier's **96.63% accuracy** measures labelling of supplied validation crops. It is not full-image detection mAP and cannot be directly compared with Exp3's mAP. A classifier cannot recover hazards absent from detector proposals.
 
-| Evaluation | Method | Precision | Recall | F1 | FP | FN |
-|---|---|---:|---:|---:|---:|---:|
-| Clean test | Exp3 alone | 0.872 | 0.888 | 0.879 | 546 | 469 |
-| Clean test | Exp3 + classifier | 0.863 | 0.861 | 0.862 | 571 | 578 |
-| Stress | Exp3 alone | 0.904 | 0.827 | 0.864 | 366 | 721 |
-| Stress | Exp3 + classifier | 0.791 | 0.595 | 0.679 | 656 | 1691 |
+<table align="center">
+  <thead>
+    <tr><th align="center">Evaluation</th><th align="center">Method</th><th align="center">Precision</th><th align="center">Recall</th><th align="center">F1</th><th align="center">FP</th><th align="center">FN</th></tr>
+  </thead>
+  <tbody>
+    <tr><td align="center">Clean test</td><td align="center">Exp3 alone</td><td align="center">0.872</td><td align="center">0.888</td><td align="center">0.879</td><td align="center">546</td><td align="center">469</td></tr>
+    <tr><td align="center">Clean test</td><td align="center">Exp3 + classifier</td><td align="center">0.863</td><td align="center">0.861</td><td align="center">0.862</td><td align="center">571</td><td align="center">578</td></tr>
+    <tr><td align="center">Stress</td><td align="center">Exp3 alone</td><td align="center">0.904</td><td align="center">0.827</td><td align="center">0.864</td><td align="center">366</td><td align="center">721</td></tr>
+    <tr><td align="center">Stress</td><td align="center">Exp3 + classifier</td><td align="center">0.791</td><td align="center">0.595</td><td align="center">0.679</td><td align="center">656</td><td align="center">1691</td></tr>
+  </tbody>
+</table>
 
 Source: [pipeline comparison](../results/final_test/detector_pipeline_comparison.csv). Adding the classifier introduces **109 additional missed objects and 25 additional false detections on clean test**, and **970 additional misses and 290 additional false detections under stress**. It reclassifies proposals as well as rejecting them; changing a correct class to an incorrect one can create both an FP and an FN. Detector-only operation is supported under these measured settings. Crop/proposal distribution differences are plausible contributors but are not proven causes. Other detector–classifier pairings were not exhaustively tested.
 
@@ -153,23 +190,57 @@ The one-factor condition study uses the same **150 source images**, largely reta
 
 ## Findings and limitations
 
-| Finding / limitation | Evidence and scope |
-|---|---|
-| Small objects remain difficult | Exp3 clean-test recall is 0.649 at 16–32 input pixels versus 0.917 at 64+ pixels (shorter box side). The under-8 and 8–16 clean-test groups have only 3 and 6 objects, so conclusions there are uncertain. |
-| Degraded conditions reduce recovery | Exp3 stress recall is 0.827 versus 0.888 on clean test; meeting the validation target does not guarantee stress recall >= 0.85. |
-| Uneven hazard-class recall | Pen, sharp and battery stress recall are 0.702, 0.748 and 0.767. An aggregate target does not guarantee every class meets it. |
-| Severe shrinkage is a major weakness | On the controlled 150-image subset, Exp3 recall falls from 0.835 control to 0.682 at scale 0.25. This is a synthetic scale change, not a measured physical distance. |
-| Dataset differs from live monitoring | Public and self-collected photographs do not establish performance in continuous household-camera scenes. Synthetic stress images are derived from existing photos, not independent camera data. |
-| Earlier test exposure | Test photographs informed earlier project development, even though they are excluded from training in this final split. This is not a completely unseen benchmark for the whole project. |
-| Annotation and duplicate uncertainty | Format checks cannot ensure complete/correct labels. Grouped visual hashes reduce leakage risk but may miss related photos; four large candidate buckets were skipped. |
-| Synthetic-training limits | Pasted crops can retain background and visible boundaries. Background crops rely on complete source annotations. |
-| Different transformed populations | Visibility filtering and transformations can change evaluated annotations. Size bins at 640 versus 960 contain different object populations. Stress improvements in a bin are not proof degradation helps. |
-| Single-run evidence | One seed and fixed budget per configuration; no multi-seed confidence intervals. The shared recipe does not isolate augmentation's benefit. |
-| No measured physical operating range | Pixels and synthetic brightness/rotation do not establish metres, lux limits or true 3D viewpoint robustness. |
-| False boxes are not parent alerts | No labelled-empty evaluation scenes were available; empty-scene alarm rates are unavailable, not zero. Temporal alerts need separate evaluation. |
-| Application validation remains | Live capture, depth-map age, latency, grouped-class spatial handling and alert behaviour need end-to-end checks. No detection does not prove safety. |
+The results support a **relative choice among the configurations tested**, but do not establish that the resulting application reliably recognises every hazard or correctly warns a caregiver. The limitations concern three different things: what the detector still misses, how much confidence can be placed in the experiment, and what has not yet been established in the complete camera application.
 
-Evidence: [class results](../results/final_test/selected_model_classes.csv), [size results](../results/final_test/recall_by_pixel_size.csv), [controlled conditions](../results/final_test/controlled_condition_results.csv), and notebook Sections 8–10. The spatial/depth timing limitations in the UI guide are application observations, separate from these detector measurements.
+### Detection limitations: what the measurements show
+
+The main operational weakness is missed hazards when usable visual detail is limited. Exp3's clean-test recall is **0.8876**, leaving **469 missed objects**; stress recall falls to **0.8272**, leaving **721**. The reduction persists despite higher stress precision. This means an output containing fewer incorrect boxes can still omit more actual hazards. The validation recall requirement is an operating-point rule, not a guarantee that a scene has been adequately inspected.
+
+The failures are unevenly distributed. Pen, sharp and battery stress recall are approximately **0.702, 0.748 and 0.767**, respectively. The selected model also has substantially lower clean-test recall at 16–32 input pixels (**0.649**) than at 64+ pixels (**0.917**). Consequently, the aggregate score cannot be used to promise the same recovery for every hazard category or apparent object size. These findings motivate targeted data and error review rather than claiming that model selection alone resolves the prototype's requirements.
+
+<table align="center">
+  <thead>
+    <tr><th align="center">Observed limitation</th><th align="center">Supporting measurement</th><th align="center">Practical implication</th><th align="center">Appropriate next check</th></tr>
+  </thead>
+  <tbody>
+    <tr><td align="center">Reduced recovery under combined degradation</td><td align="center">Exp3 recall: 0.888 clean test versus 0.827 stress</td><td align="center">The validation threshold does not ensure comparable recovery in degraded scenes</td><td align="center">Evaluate representative camera footage with recorded conditions</td></tr>
+    <tr><td align="center">Uneven class recovery</td><td align="center">Pen / sharp / battery stress recall: 0.702 / 0.748 / 0.767</td><td align="center">Some hazard groups remain less reliably recovered than the average</td><td align="center">Review class-specific false negatives and confusing annotations</td></tr>
+    <tr><td align="center">Sensitivity to apparent size</td><td align="center">Recall 0.649 at 16–32 input pixels versus 0.917 at 64+</td><td align="center">Small objects can remain undetected even when larger examples are recognised</td><td align="center">Collect representative small-object views and retain support counts</td></tr>
+    <tr><td align="center">Severe shrinking affects both measures</td><td align="center">On 150 images, scale 0.25 reduces recall 0.835 to 0.682 and raises FP/image about 0.113 to 0.220</td><td align="center">This condition produces both more misses and more false boxes</td><td align="center">Check controlled scale reduction against genuine camera-distance cases</td></tr>
+    <tr><td align="center">Crop-stage performance does not transfer</td><td align="center">Exp6 adds 109 clean-test misses and 970 stress misses</td><td align="center">A strong crop-accuracy headline is insufficient for selecting a pipeline</td><td align="center">Inspect detector-generated crops and reclassification/rejection errors</td></tr>
+  </tbody>
+</table>
+
+### Experimental limitations: how broadly the results can be interpreted
+
+**Dataset independence is limited.** Public-source and self-collected images are split by detected photo groups, and exact-copy checks reduce obvious overlap. Nevertheless, visual hashing cannot identify every related scene, and four large candidate buckets were skipped. In addition, these photographs informed earlier project development. The final split is excluded from training in this rerun, but it is not a completely unseen benchmark for the project as a whole. These safeguards reduce leakage risk; they do not justify claiming complete independence.
+
+**Annotation validity differs from annotation quality.** Readability, coordinate and class-ID checks confirm that the data can be processed. They do not prove that every visible object has a correct, tightly fitting box. The 37 folder/class mismatches were retained for review because images may legitimately contain multiple classes. The available record does not establish a complete manual correction audit. Background examples also depend on the absence of unlabelled hazards, while pasted objects can introduce unnatural edges or retained background.
+
+**The comparisons are single-run, recipe-specific evidence.** Each detector configuration uses one seed and the fixed training budget; no repeated-run confidence intervals are available. All detectors share balancing, extras and augmentation, so the study does not isolate the contribution of any one of those data choices. The P2 configuration also uses transferred compatible layers and newly initialised additional layers. The evidence supports the tested configurations, not a universal conclusion that higher resolution, P2 or classification stages are inferior.
+
+**Synthetic conditions and size bins have different populations.** Stress transformations change appearance and geometry, and visibility filtering can remove annotations. The controlled-condition analysis uses only 150 source images. Pixel bins contain different objects across 640- and 960-pixel inputs, and the smallest clean-test groups contain only three and six objects. These details constrain comparisons: a higher stress or small-bin score is not proof that degradation helps, and a zero recall in a tiny group is not a universal detection-size boundary.
+
+### Application limitations: what the detector study does not validate
+
+The experiment measures annotated-image detection, not the correctness of spatial risk scores or parent notifications. Physical camera-to-object range, measured lighting limits, true 3D viewpoint changes, end-to-end delay and temporal alert behaviour have not been established by these tables. An available image-plane/depth heuristic is not an independently validated reachability or safety model.
+
+<table align="center">
+  <thead>
+    <tr><th align="center">Unresolved application issue</th><th align="center">Why the current evidence is insufficient</th><th align="center">Required before making the corresponding claim</th></tr>
+  </thead>
+  <tbody>
+    <tr><td align="center">Physical detection range</td><td align="center">Input pixels do not specify distance in metres; object size and camera optics vary</td><td align="center">Record actual object dimensions, distances, camera setup and successes/failures</td></tr>
+    <tr><td align="center">Empty-scene / caregiver false alarms</td><td align="center">Evaluation contains no labelled-empty scenes; false boxes are not notifications</td><td align="center">Label empty and realistic background scenes, then evaluate complete alert events</td></tr>
+    <tr><td align="center">Seven-group spatial integration</td><td align="center">Current spatial filtering excludes <code>small_object</code>, <code>sharp</code> and <code>medicine</code>; merged <code>pen</code> uses a legacy weight</td><td align="center">Agree on grouped risk policies and test every final label through the complete app</td></tr>
+    <tr><td align="center">Live depth and timing</td><td align="center">Frame-relative depth, freshness fallback and score persistence affect the displayed result</td><td align="center">Measure detection latency, depth age, score clearance and notification delay on deployment hardware</td></tr>
+    <tr><td align="center">Unseen-household generalisation</td><td align="center">Synthetic variants reuse the photographed objects/scenes</td><td align="center">Evaluate a separately collected, representative camera set before tuning against it</td></tr>
+  </tbody>
+</table>
+
+The absent empty-scene alarm rate is **unavailable, not zero**. Similarly, an app-level SAFE or no-detection output cannot establish that there is no hazard: it can reflect a missing detection, absent person reference, filtered class, stale/missing depth or the selected scoring policy. These are reasons to keep the prototype's scope explicit, not reasons to hide the measured improvements.
+
+Evidence: [class results](../results/final_test/selected_model_classes.csv), [size results](../results/final_test/recall_by_pixel_size.csv), [controlled conditions](../results/final_test/controlled_condition_results.csv), [pipeline results](../results/final_test/detector_pipeline_comparison.csv), and notebook Sections 8–10. Spatial behaviour is documented separately in the [spatial guide](SPATIAL_ANALYSIS.md); it is not a detector benchmark result.
 
 ## Future work and application handoff
 
@@ -180,6 +251,26 @@ Evidence: [class results](../results/final_test/selected_model_classes.csv), [si
 5. Integrate `final_best.pt` with input 640 and confidence 0.30. Preserve model class names, keep Exp6 disabled, and review the legacy spatial mapping for grouped `small_object`, `sharp`, `medicine` and `pen` labels. A group-level prediction cannot recover the original fine-grained class.
 
 The current `modules/spatial.py` risk weights use fourteen legacy classes. Its hazard filter requires membership in that mapping, so grouped `small_object`, `sharp` and `medicine` detections are currently excluded from spatial risk scoring; the default weight does not rescue them after that filter. The merged `pen` group retains a pen-only weight. See the [spatial integration assessment](SPATIAL_ANALYSIS.md#seven-class-integration-gap). The existing alias for `medicine_syrup` does not handle grouped `medicine`. This documentation update records the mismatch without changing application behaviour or choosing new risk weights.
+
+## Conclusion
+
+The final study selects **Experiment 3: YOLOv8s at 640-pixel input and confidence 0.30, without the crop classifier**, following the clean-validation selection rule and validation threshold procedure. It leads the six standalone detectors in mAP@50–95 on clean validation, validation stress, clean test and test stress. Its clean-test score of **0.6549** improves on the baseline's **0.6052**, while test-stress mAP improves from **0.5662 to 0.6080**. The supported result is therefore a consistent improvement within the prepared dataset and shared training recipe.
+
+The experiments also identify which intuitively attractive changes did not help under the tested conditions. The lower learning rate and both 960-pixel configurations reduce aggregate mAP against their intended references. P2 at 640 is competitive but below plain YOLOv8s overall. Most significantly, **96.63% standalone crop accuracy does not translate into a better full detection pipeline**: Exp6 increases false detections and missed hazards, particularly under stress. Recording these outcomes provides a reasoned deployment choice rather than selecting whichever model has the largest headline metric.
+
+<table align="center">
+  <thead>
+    <tr><th align="center">Decision</th><th align="center">Evidence</th><th align="center">Boundary of the conclusion</th></tr>
+  </thead>
+  <tbody>
+    <tr><td align="center">Retain Exp3 as the selected detector</td><td align="center">Highest mAP across all four reported sets; 0.888 clean-test recall at the fixed operating threshold</td><td align="center">Best among these tested runs, not a guarantee for unseen camera scenes</td></tr>
+    <tr><td align="center">Keep Exp6 out of the recommended configuration</td><td align="center">More FP and FN on clean and stress test; no tested classifier threshold meets validation recall target</td><td align="center">Applies to this classifier, proposal pipeline and settings</td></tr>
+    <tr><td align="center">Prioritise small-object and difficult-class investigation</td><td align="center">Size-dependent recall, weak pen/sharp/battery recovery and severe-scale failures</td><td align="center">Specific causes and remedies still need targeted validation</td></tr>
+    <tr><td align="center">Complete spatial and live-camera validation before application claims</td><td align="center">Grouped-label mapping is incomplete; no physical-range or end-to-end alert benchmark</td><td align="center">Dataset detection scores do not certify the complete monitoring system</td></tr>
+  </tbody>
+</table>
+
+The contribution of this work is a traceable preparation and evaluation record, a defensible detector selection, and an evidence-based account of remaining failures. The next milestone is **correct seven-group application integration followed by representative camera and alert testing**, rather than treating the higher mAP alone as proof that the monitoring problem is solved. A missing detection must never be presented as proof of a safe scene.
 
 ## Reproduction and records
 
@@ -193,18 +284,23 @@ The baseline source session was stopped after completing baseline and Exp1; its 
 
 ## Artifact locations and verification
 
-| Artifact | Location / record |
-|---|---|
-| Baseline + Exp1 | [Kaggle baseline notebook, version 8](https://www.kaggle.com/code/oliviaee/cvdl-final-baseline-exp1) — manifest records version 8 and session 369424590 |
-| Exp2 | [Kaggle Exp2](https://www.kaggle.com/code/oliviaee/cvdl-exp2) |
-| Exp3 | [Kaggle Exp3](https://www.kaggle.com/code/oliviaee/cvdl-exp3) |
-| Exp4 | [Kaggle Exp4](https://www.kaggle.com/code/tzehui/cvdl-exp4) |
-| Exp5 | [Kaggle Exp5](https://www.kaggle.com/code/tzehui/cvdl-exp5) |
-| Exp6 | [Kaggle Exp6](https://www.kaggle.com/code/tzehui/cvdl-final-exp6) |
-| Final evaluation | [Kaggle Sections 7–10](https://www.kaggle.com/code/tzehui/cvdl-final-section-7-10) |
-| Evaluation input | Private Kaggle Dataset `tzehui/cvdl-output`; bundle root `CVDL_Final_Evaluation_Bundle` |
-| Selected checkpoint | Final evaluation output: `CVDL_Final_Evaluation/models/final_best.pt`; copy locally to `weights/final_best.pt` |
-| Full failure records and images | Original final evaluation output, including `object_outcomes.csv`, `metrics/` and `evaluation_images/` |
+<table align="center">
+  <thead>
+    <tr><th align="center">Artifact</th><th align="center">Location / record</th></tr>
+  </thead>
+  <tbody>
+    <tr><td align="center">Baseline + Exp1</td><td align="center"><a href="https://www.kaggle.com/code/oliviaee/cvdl-final-baseline-exp1">Kaggle baseline notebook, version 8</a> — manifest records version 8 and session 369424590</td></tr>
+    <tr><td align="center">Exp2</td><td align="center"><a href="https://www.kaggle.com/code/oliviaee/cvdl-exp2">Kaggle Exp2</a></td></tr>
+    <tr><td align="center">Exp3</td><td align="center"><a href="https://www.kaggle.com/code/oliviaee/cvdl-exp3">Kaggle Exp3</a></td></tr>
+    <tr><td align="center">Exp4</td><td align="center"><a href="https://www.kaggle.com/code/tzehui/cvdl-exp4">Kaggle Exp4</a></td></tr>
+    <tr><td align="center">Exp5</td><td align="center"><a href="https://www.kaggle.com/code/tzehui/cvdl-exp5">Kaggle Exp5</a></td></tr>
+    <tr><td align="center">Exp6</td><td align="center"><a href="https://www.kaggle.com/code/tzehui/cvdl-final-exp6">Kaggle Exp6</a></td></tr>
+    <tr><td align="center">Final evaluation</td><td align="center"><a href="https://www.kaggle.com/code/tzehui/cvdl-final-section-7-10">Kaggle Sections 7–10</a></td></tr>
+    <tr><td align="center">Evaluation input</td><td align="center">Private Kaggle Dataset <code>tzehui/cvdl-output</code>; bundle root <code>CVDL_Final_Evaluation_Bundle</code></td></tr>
+    <tr><td align="center">Selected checkpoint</td><td align="center">Final evaluation output: <code>CVDL_Final_Evaluation/models/final_best.pt</code>; copy locally to <code>weights/final_best.pt</code></td></tr>
+    <tr><td align="center">Full failure records and images</td><td align="center">Original final evaluation output, including <code>object_outcomes.csv</code>, <code>metrics/</code> and <code>evaluation_images/</code></td></tr>
+  </tbody>
+</table>
 
 Kaggle pages/datasets may require author-granted access. Page URLs can advance to newer versions; compare source-session records and SHA-256 checksums in the manifest rather than assuming the latest output is identical. Models and datasets are not uploaded by this change. Source image URLs/licences and earlier V2/V3 report citations are not fully supplied in the notebook and still need attribution before final submission.
 
