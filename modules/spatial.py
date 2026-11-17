@@ -147,6 +147,32 @@ def depth_adjusted_distance(child: Detection, hazard: Detection) -> tuple[float,
     return norm_dist, depth_diff, effective_dist
 
 
+def pair_distances(detections: list[Detection]) -> list[dict]:
+    """Every child-hazard pair with its depths, distance and zone, closest
+    first. Same maths as SpatialAnalyzer.assess(); used to list each pair in
+    the UI, so two children near one hazard are both shown."""
+    detections = [d for d in detections if d.bbox is not None]
+    children = [d for d in detections if _label(d) in CHILD_LABELS]
+    hazards = [d for d in detections if _label(d) not in CHILD_LABELS
+               and _label(d) in DANGER_WEIGHTS]
+    pairs = []
+    for ci, child in enumerate(children, start=1):
+        for hz in hazards:
+            planar, depth_diff, effective = depth_adjusted_distance(child, hz)
+            pairs.append({
+                "child": f"Person {ci}",
+                "hazard": hz.label.replace("_", " "),
+                "child_depth": getattr(child, "depth", None),
+                "hazard_depth": getattr(hz, "depth", None),
+                "depth_diff": depth_diff,
+                "planar": planar,
+                "distance": effective,
+                "zone": _zone(effective),
+            })
+    pairs.sort(key=lambda p: p["distance"])
+    return pairs
+
+
 class ScoreHold:
     """Keeps the highest recent score for `seconds`, so one missed detection
     doesn't drop a real danger to 0. Assessment itself stays per-frame."""

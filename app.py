@@ -30,7 +30,7 @@ from modules.classifier import (
 )
 from modules.notifier import TelegramNotifier
 from modules.subscriptions import SubscriptionStore, start_poller
-from modules.spatial import CHILD_LABELS, DANGER_WEIGHTS, ScoreHold
+from modules.spatial import CHILD_LABELS, DANGER_WEIGHTS, ScoreHold, pair_distances
 from modules.spatial_pipeline import MAX_DEPTH_AGE, colorize_depth
 
 
@@ -455,6 +455,18 @@ def render_assessment(result=None, error=None, stale=False, idle=False, prefix="
                       "The danger level currently comes from the detected objects only.", compact=True)
         elif result is not None and not (error or stale or idle):
             st.write(result.reason or "No spatial explanation provided.")
+            pairs = pair_distances(result.detections)
+            if pairs:
+                fmt = lambda v: "–" if v is None else f"{v:.2f}"
+                st.dataframe(
+                    [{"Child": p["child"], "Hazard": p["hazard"],
+                      "Child depth": fmt(p["child_depth"]), "Hazard depth": fmt(p["hazard_depth"]),
+                      "Depth diff": fmt(p["depth_diff"]),
+                      "Distance": f'{p["distance"]:.2f}× height', "Zone": p["zone"]}
+                     for p in pairs],
+                    hide_index=True, width="stretch")
+                st.caption("Every child–hazard pair, closest first. Distance combines the on-screen "
+                           "gap and the depth difference; the danger score uses the closest pair.")
             status = result.depth_status
             if status.startswith("Depth unavailable"):
                 status = "Depth unavailable; image-plane distance only (details in Settings)."
