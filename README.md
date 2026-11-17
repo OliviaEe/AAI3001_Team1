@@ -33,6 +33,16 @@ A team computer-vision prototype combining hazard detection, a person reference,
 
 Experiment 6 obtains **96.63% crop-validation accuracy**, but adding it to the detector increases missed hazards and false detections. It is retained as an experiment, not recommended for the final operating configuration.
 
+## Known Limitations
+
+The selected detector still produces **false positives** (incorrect hazard detections) and **false negatives** (missed hazards).
+
+At confidence `0.30`, the clean test evaluation recorded **546 false detections and 469 missed objects across 2,568 images**. Under synthetic stress, false detections decreased to **366**, while missed objects increased to **721**. These are object-level counts, not caregiver-alert counts.
+
+Small objects, blurred images and unfamiliar camera scenes remain challenging. A frame with no detections does not establish that the scene is safe.
+
+The complete camera, spatial/depth and notification pipeline requires separate validation. See [detailed model failures and limitations](docs/MODEL_RESULTS.md#failure-analysis-and-practical-consequences) and the [spatial integration gap](docs/SPATIAL_ANALYSIS.md#seven-class-integration-gap).
+
 ## System scope and integration status
 
 ```text
