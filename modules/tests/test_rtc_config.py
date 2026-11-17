@@ -1,7 +1,7 @@
 """Connection setup tests use stand-in providers, never real TURN accounts."""
 import pytest
 
-from modules.rtc_config import camera_connection_label, camera_rtc_configuration
+from modules.rtc_config import camera_connection_label, camera_rtc_configuration, fetch_metered_ice_servers
 
 
 KEYS = {"CLOUDFLARE_TURN_KEY_ID": "test-key", "CLOUDFLARE_TURN_KEY_API_TOKEN": "test-secret"}
@@ -71,3 +71,60 @@ def test_stun_only_provider_response_is_not_reported_as_turn_available():
 ])
 def test_status_reports_actual_connection(requested, playing, label):
     assert camera_connection_label(requested, playing) == label
+
+
+METERED_KEYS = {"METERED_TURN_DOMAIN": "example.metered.live", "METERED_TURN_API_KEY": "metered-test-key"}
+
+
+def test_metered_takes_precedence_and_keeps_api_key_out_of_rtc_settings():
+    def provider(**kwargs):
+        assert kwargs == {"domain": "example.metered.live", "api_key": "metered-test-key"}
+        return [{"urls": "turn:standard.relay.metered.ca:80", "username": "user", "credential": "password"}]
+
+    config, method, warning = camera_rtc_configuration(
+        APP_URL, (KEYS | METERED_KEYS).get, unused_provider, provider,
+    )
+    assert method == "Metered TURN available"
+    assert "metered-test-key" not in repr(config)
+    assert warning is None
+
+
+def test_metered_failure_does_not_fall_back_to_cloudflare_or_expose_api_key():
+    def provider(**kwargs):
+        raise RuntimeError("Failed URL contains metered-test-key")
+
+    config, method, warning = camera_rtc_configuration(
+        APP_URL, (KEYS | METERED_KEYS).get, unused_provider, provider,
+    )
+    assert "STUN only" in method
+    assert "Metered" in warning and "unavailable" in warning
+    assert "metered-test-key" not in repr((config, method, warning))
+
+
+def test_partial_metered_configuration_does_not_activate_cloudflare():
+    config, method, warning = camera_rtc_configuration(
+        APP_URL, (KEYS | {"METERED_TURN_DOMAIN": "example.metered.live"}).get,
+        unused_provider, unused_provider,
+    )
+    assert "incomplete" in warning and "Metered" in warning
+
+
+@pytest.mark.parametrize("domain", ["example.metered.live", "https://example.metered.live/"])
+def test_metered_request_uses_credential_endpoint(domain):
+    from types import SimpleNamespace
+
+    def get(url, **kwargs):
+        assert url == "https://example.metered.live/api/v1/turn/credentials"
+        assert kwargs == {"params": {"apiKey": "test-key"}, "timeout": 10}
+        return SimpleNamespace(raise_for_status=lambda: None, json=lambda: [{"urls": "turn:test:80"}])
+
+    assert fetch_metered_ice_servers(domain, "test-key", http_get=get) == [{"urls": "turn:test:80"}]
+
+
+@pytest.mark.parametrize("domain", [
+    "http://example.metered.live", "https://example.com", "https://example.metered.live.evil.com",
+    "https://user:password@example.metered.live", "https://example.metered.live/custom",
+])
+def test_metered_domain_cannot_send_api_key_to_another_service(domain):
+    with pytest.raises(ValueError):
+        fetch_metered_ice_servers(domain, "test-key", http_get=unused_provider)

@@ -187,7 +187,7 @@ libglib2.0-0t64
 The Telegram bot token is configured through Streamlit's Secrets settings.
 
 For camera connections that fail on other networks, see the optional
-[Cloudflare TURN setup guide](docs/CLOUD_CAMERA.md).
+[TURN setup guide](docs/CLOUD_CAMERA.md) for Metered or Cloudflare.
 
 Cloud testing confirmed that uploaded-image inference, live camera monitoring, and Telegram alert delivery work. Processing speed depends on the available cloud resources and network connection. Local database storage is not guaranteed to persist across cloud rebuilds or restarts.
 

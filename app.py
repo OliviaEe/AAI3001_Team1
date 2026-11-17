@@ -33,7 +33,7 @@ from modules.classifier import (
 )
 from modules.notifier import TelegramNotifier
 from modules.subscriptions import SubscriptionStore, start_poller
-from modules.rtc_config import camera_connection_label, camera_rtc_configuration
+from modules.rtc_config import camera_connection_label, camera_rtc_configuration, fetch_metered_ice_servers
 from modules.spatial import CHILD_LABELS, DANGER_WEIGHTS, MAX_NORM_DIST, ScoreHold, pair_distances
 from modules.spatial_pipeline import MAX_DEPTH_AGE, colorize_depth
 
@@ -258,6 +258,11 @@ def load_services():
     if notifier.token:
         start_poller(notifier.token, store, notifier.api_base)   # bot: /start, /rooms, /stop
     return notifier, store
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def load_metered_ice_servers(domain, api_key):
+    return fetch_metered_ice_servers(domain, api_key)
 
 
 def camera_setting(name):
@@ -931,6 +936,7 @@ with tab_live:
             control = controls.control or initial_control
             rtc_settings, connection_method, relay_warning = camera_rtc_configuration(
                 st.context.url, camera_setting, get_cloudflare_ice_servers,
+                fetch_metered_servers=load_metered_ice_servers,
             )
             if relay_warning:
                 st.warning(relay_warning)
