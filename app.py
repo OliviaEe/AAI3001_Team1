@@ -11,7 +11,6 @@ import os
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import urlsplit
 
 # Keep model CPU work from occupying every core in this UI process.
 os.environ.setdefault("OMP_NUM_THREADS", "2")
@@ -26,6 +25,7 @@ import numpy as np
 import pyarrow  # noqa: F401
 import streamlit as st
 from streamlit_webrtc import RTCConfiguration, WebRtcMode, webrtc_streamer
+from streamlit_webrtc.credentials import get_cloudflare_ice_servers
 
 from modules.camera import CameraProcessor, analyse_video, draw_result
 from modules.classifier import (
@@ -33,6 +33,7 @@ from modules.classifier import (
 )
 from modules.notifier import TelegramNotifier
 from modules.subscriptions import SubscriptionStore, start_poller
+from modules.rtc_config import camera_connection_label, camera_rtc_configuration
 from modules.spatial import CHILD_LABELS, DANGER_WEIGHTS, MAX_NORM_DIST, ScoreHold, pair_distances
 from modules.spatial_pipeline import MAX_DEPTH_AGE, colorize_depth
 
@@ -257,6 +258,16 @@ def load_services():
     if notifier.token:
         start_poller(notifier.token, store, notifier.api_base)   # bot: /start, /rooms, /stop
     return notifier, store
+
+
+def camera_setting(name):
+    value = os.getenv(name)
+    if value:
+        return value
+    try:
+        return st.secrets.get(name)
+    except (FileNotFoundError, KeyError):
+        return None
 
 
 classifier, is_demo, model_problem = load_classifier()
@@ -509,7 +520,7 @@ def level_box(level, message):
             '<div class="risk-meter-labels"><span>Safe</span><span>Danger</span></div></div>')
 
 
-def render_assessment(result=None, error=None, stale=False, idle=False, prefix="live"):
+def render_assessment(result=None, error=None, stale=False, idle=False, prefix="live", connecting=False):
     tech = show_tech
     pair = worst_pair(result.detections) if result is not None and spatial_connected else None
     with st.container(border=True, key=f"preview_{prefix}_assessment"):
@@ -519,6 +530,8 @@ def render_assessment(result=None, error=None, stale=False, idle=False, prefix="
             if tech:
                 with st.expander("Error details"):
                     st.text(error)
+        elif connecting:
+            state_box("Connecting to camera", "Waiting for camera permission and a video connection.")
         elif is_demo:
             if result is None:
                 state_box("Practice mode", "Start the camera or test an image to see a sample result.")
@@ -899,8 +912,7 @@ with tab_live:
     model_pill = ("Demo model" if is_demo else
                   "Trained model + spatial" if getattr(classifier, "detector", classifier) is not classifier
                   else "Stock model + spatial")
-    st.html(f'<div class="live-heading"><h1>Live Monitoring</h1><span class="{"pill live" if running else "pill"}">'
-            f'● {"Camera on" if running else "Camera stopped"}</span><span class="pill">{model_pill}</span></div>')
+    live_heading_area = st.container()
     if model_problem:
         st.error(f"{model_problem} The app is running in demo mode with random scores.")
     elif model_pill == "Stock model + spatial":
@@ -917,6 +929,11 @@ with tab_live:
                 default={"control": initial_control}, on_control_change=lambda: None,
             )
             control = controls.control or initial_control
+            rtc_settings, connection_method, relay_warning = camera_rtc_configuration(
+                st.context.url, camera_setting, get_cloudflare_ice_servers,
+            )
+            if relay_warning:
+                st.warning(relay_warning)
             with video_area:
                 if not control["running"]:
                     st.html('<div class="camera-placeholder"><div class="camera-symbol"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg></div>'
@@ -928,19 +945,28 @@ with tab_live:
                                     "frameRate": {"ideal": 20, "max": 24}}
                 if control["device"]:
                     video_constraint["deviceId"] = {"exact": control["device"]}
-                local_preview = urlsplit(st.context.url).hostname in {"localhost", "127.0.0.1", "::1"}
                 # streamlit-webrtc reads its remembered camera only when it mounts, so a
                 # per-device key forces a remount after the input changes (only possible while stopped).
                 cam_key = "preview-camera" + (f"-{control['device'][:16]}" if control["device"] else "")
                 ctx = webrtc_streamer(
                     key=cam_key, mode=WebRtcMode.SENDRECV,
-                    rtc_configuration=RTCConfiguration({"iceServers": [] if local_preview else [{"urls": ["stun:stun.l.google.com:19302"]}]}),
+                    rtc_configuration=RTCConfiguration(rtc_settings),
                     video_processor_factory=make_processor,
                     media_stream_constraints={"video": video_constraint, "audio": False},
                     desired_playing_state=bool(control["running"]), media_toggle_controls=False,
                     async_processing=True,
                     video_html_attrs={"autoPlay": True, "controls": False, "muted": True, "style": {"width": "100%", "height": "auto", "display": "block", "objectFit": "contain", "objectPosition": "center", "backgroundColor": "#e9eef4", "borderRadius": "8px"}},
                 )
+
+    @st.fragment(run_every=1.0)
+    def live_heading():
+        playing = bool(ctx.state.playing)
+        label = camera_connection_label(bool(control["running"]), playing)
+        st.html(f'<div class="live-heading"><h1>Live Monitoring</h1><span class="{"pill live" if playing else "pill"}">'
+                f'● {label}</span><span class="pill">{model_pill}</span></div>')
+
+    with live_heading_area:
+        live_heading()
 
     def live_snapshot():
         """(processor, playing, result, error, age) from the camera thread."""
@@ -962,6 +988,8 @@ with tab_live:
             b.metric("Latency", f"{processor.latency_ms:.0f} ms" if processor and playing else "—")
             c.metric("Result age", f"{age:.1f} s" if age is not None else "—")
             st.caption(f"Classifier: {type(classifier).__name__} · Inference limit: {max_fps}/s")
+            st.caption(f"Camera connection: {camera_connection_label(bool(control['running']), playing)} "
+                       f"· {connection_method}")
 
     def shown_frame(processor, playing, error):
         """(chosen candidate, frames it was picked from, frames scanned this round)."""
@@ -982,7 +1010,8 @@ with tab_live:
         frame = None
         if best is not None:
             result, frame = best.result, best.frame
-        render_assessment(result, error=error, stale=stale, idle=not playing)
+        render_assessment(result, error=error, stale=stale, idle=not playing,
+                          connecting=bool(control["running"]) and not playing)
         render_alerts(result, processor, eligible=playing and not error and not stale, frame=frame)
 
     def candidate_strip(candidates, best, thumb_w=200, per_row=5):
