@@ -21,6 +21,18 @@ if TYPE_CHECKING:
     from modules.spatial import BaseSpatialAnalyzer
 
 
+def model_threads() -> int:
+    """PyTorch CPU threads for the models (MODEL_THREADS env var, default 2).
+
+    2 keeps a laptop responsive while it also encodes the video; a server with
+    more cores can raise it (deploy/gcp/setup_vm.sh sets it from the core count).
+    """
+    try:
+        return max(1, int(os.getenv("MODEL_THREADS", "2")))
+    except ValueError:
+        return 2
+
+
 class DangerLevel(IntEnum):
     SAFE = 0
     LOW = 1
@@ -141,7 +153,7 @@ class SpatialDemoClassifier(BaseClassifier):
         self.model.predict(np.zeros((480, 640, 3), np.uint8), conf=HAZARD_CONF,
                            imgsz=self.imgsz, classes=self.wanted, verbose=False)
         # YOLO setup resets the CPU pool; limit it after setup so video has CPU time.
-        torch.set_num_threads(2)
+        torch.set_num_threads(model_threads())
 
         # Reuse the downloaded depth model without waiting for network metadata.
         cache = Path(self.weights_path).parent / "huggingface"
@@ -213,7 +225,7 @@ class HazardSpatialClassifier(SpatialDemoClassifier):
         self.detector = YOLODetector(hazard_weights)
         self.mode = f"Trained hazard model: {len(self.detector.names)} classes"
         import torch
-        torch.set_num_threads(2)     # loading YOLO resets the CPU pool; keep cores for the video
+        torch.set_num_threads(model_threads())   # loading YOLO resets the CPU pool; keep cores for the video
 
     def _detect(self, frame_bgr: np.ndarray, depth_map) -> list[Detection]:
         from modules.spatial_pipeline import yolo_to_detections
