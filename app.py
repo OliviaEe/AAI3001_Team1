@@ -21,6 +21,9 @@ os.environ.setdefault("KMP_BLOCKTIME", "0")
 
 import cv2
 import numpy as np
+# Load pyarrow (used by st.dataframe / charts) before the models: importing it for the
+# first time after torch + transformers are running crashed the process (access violation).
+import pyarrow  # noqa: F401
 import streamlit as st
 from streamlit_webrtc import RTCConfiguration, WebRtcMode, webrtc_streamer
 
@@ -30,7 +33,7 @@ from modules.classifier import (
 )
 from modules.notifier import TelegramNotifier
 from modules.subscriptions import SubscriptionStore, start_poller
-from modules.spatial import CHILD_LABELS, DANGER_WEIGHTS, ScoreHold, pair_distances
+from modules.spatial import CHILD_LABELS, DANGER_WEIGHTS, MAX_NORM_DIST, ScoreHold, pair_distances
 from modules.spatial_pipeline import MAX_DEPTH_AGE, colorize_depth
 
 
@@ -120,6 +123,11 @@ h3 { font-size: 1.1rem !important; }
 .camera-placeholder .camera-symbol { font-size: 42px; margin-bottom: 8px; }
 .camera-placeholder strong { font-size: 20px; color: #334b66; }
 .camera-placeholder p { font-size: 14px; color: #64748b; margin-top: 8px; }
+.risk-meter { display: flex; gap: 5px; margin: 12px auto 2px; max-width: 240px; }
+.risk-meter span { flex: 1; height: 8px; border-radius: 4px; background: #d9e1ea; }
+.risk-meter span.on { background: var(--meter); }
+.risk-meter-labels { display: flex; justify-content: space-between; max-width: 240px; margin: 0 auto;
+  font-size: 11px; color: #6b7c93; }
 .object-row { padding: 10px 0; border-bottom: 1px solid #e4eaf1; display: flex; justify-content: space-between; }
 .object-row span { color: #64748b; }
 .footer { margin-top: 25px; text-align: right; font-size: 12px; color: #6b7c93; }
@@ -137,7 +145,16 @@ h3 { font-size: 1.1rem !important; }
 }
 .st-key-preview_settings [data-testid="stPopoverButton"] { height: 46px; border-radius: 8px; }
 .st-key-preview_settings [data-testid="stPopoverButton"] > div > div[aria-hidden="true"] { display: none; }
-[data-testid="stTabs"] [role="tablist"] { padding-right: 145px; }
+.st-key-preview_navigation > [data-testid="stLayoutWrapper"]:has(.st-key-preview_guide) {
+  position: absolute; right: 136px; top: 8px; width: 110px; z-index: 20;
+}
+.st-key-preview_guide button { height: 46px; border-radius: 8px; }
+.tour-steps { display: flex; gap: 6px; margin: 0 0 14px; }
+.tour-steps span { flex: 1; height: 6px; border-radius: 3px; background: #d9e1ea; }
+.tour-steps span.done { background: #10888e; }
+.tour-legend { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; margin: 6px 0 12px; }
+.tour-legend b { padding: 4px 10px; border-radius: 6px; text-align: center; font-size: 14px; }
+[data-testid="stTabs"] [role="tablist"] { padding-right: 265px; }
 [data-testid="stTabPanel"] { padding-top: 12px; }
 h1 { font-family: Arial, sans-serif; font-size: 32px !important; margin: 0 !important; padding: 0 0 4px !important; }
 .live-heading { display: flex; align-items: center; gap: 22px; min-height: 48px; flex-wrap: wrap; }
@@ -389,91 +406,152 @@ def queue_alert(result, frame, room_id):
     notifier.send_alert(result, frame, room_id, store).add_done_callback(done)
 
 
+# ---- plain-language wording for caregivers (numbers only under "technical details") ----
+LEVEL_TEXT = {
+    DangerLevel.SAFE: ("Safe", "Nothing dangerous is near the child."),
+    DangerLevel.LOW: ("Low risk", "A hazard is in view, but not near the child."),
+    DangerLevel.MEDIUM: ("Be careful", "A hazard is getting close to the child. Keep an eye on them."),
+    DangerLevel.HIGH: ("Danger", "A hazard is within the child's reach. Check on them now."),
+}
+DISTANCE_TEXT = {"CRITICAL": "within reach of", "WARNING": "close to", "CAUTION": "near", "SAFE": "far from"}
+DISPLAY_NAMES = {"coin_battery": "button battery", "small_object": "small object", "sharp": "sharp object",
+                 "liquid_medicine": "medicine syrup", "pill_bottle": "pill bottle", "pill_packet": "pill packet",
+                 "small_toy": "small toy", "pencap": "pen cap", "bottlecap": "bottle cap"}
+RISK_TYPE = {
+    "battery": "Swallowing / burn risk", "coin_battery": "Swallowing / burn risk",
+    "coin": "Choking risk", "small_object": "Choking risk", "marble": "Choking risk", "dice": "Choking risk",
+    "small_toy": "Choking risk", "bottlecap": "Choking risk", "pencap": "Choking risk", "pen": "Poking risk",
+    "sharp": "Cut risk", "knife": "Cut risk", "scissors": "Cut risk",
+    "medicine": "Poisoning risk", "liquid_medicine": "Poisoning risk", "pill_bottle": "Poisoning risk",
+    "pill_packet": "Poisoning risk",
+}
+
+
+def label_key(label):
+    return label.lower().replace(" ", "_")
+
+
+def nice_name(label):
+    key = label_key(label)
+    return DISPLAY_NAMES.get(key, key.replace("_", " "))
+
+
+def worst_pair(detections):
+    """The child-hazard pair that drives the danger level (same maths as spatial.py)."""
+    def risk(p):
+        weight = DANGER_WEIGHTS.get(label_key(p["hazard"]), 0.5)
+        return weight * max(0.0, 1.0 - p["distance"] / MAX_NORM_DIST)
+    pairs = pair_distances(detections)
+    return max(pairs, key=risk) if pairs else None
+
+
+def level_box(level, message):
+    """Big plain-language level with a 4-step colour meter instead of a score."""
+    title, _ = LEVEL_TEXT[level]
+    bars = "".join(f'<span class="{"on" if i <= int(level) else ""}"></span>' for i in range(4))
+    st.html(f'<div class="state-box severity-{level.name.lower()}"><strong>{escape(title)}</strong>'
+            f'<p>{escape(message)}</p><div class="risk-meter" style="--meter:{level.color}">{bars}</div>'
+            '<div class="risk-meter-labels"><span>Safe</span><span>Danger</span></div></div>')
+
+
 def render_assessment(result=None, error=None, stale=False, idle=False, prefix="live"):
+    tech = show_tech
+    pair = worst_pair(result.detections) if result is not None and spatial_connected else None
     with st.container(border=True, key=f"preview_{prefix}_assessment"):
         panel_title("Assessment", "assessment")
         if error:
-            state_box("Assessment unavailable", "Processing failed. No current danger assessment.", "error")
-            with st.expander("Error details"):
-                st.text(error)
+            state_box("Something went wrong", "The check failed, so there is no result right now.", "error")
+            if tech:
+                with st.expander("Error details"):
+                    st.text(error)
         elif is_demo:
             if result is None:
-                state_box("Simulated assessment", "Start monitoring or analyse an image to generate a test result.")
+                state_box("Practice mode", "Start the camera or test an image to see a sample result.")
             else:
-                tone = f"severity-{result.level.name.lower()}"
-                state_box(f"Simulated level: {result.level.name}", f"Random score: {result.score:.2f}", tone)
+                level_box(result.level, "Practice mode: this result is random, not a real check.")
         elif idle:
-            state_box("Monitoring stopped", "Start the camera to request an assessment.")
+            state_box("Camera is off", "Press Start monitoring to begin watching.")
         elif stale:
-            state_box("Assessment outdated", "Waiting for a fresh result. Previous result is hidden.", "warning")
+            state_box("Updating...", "Waiting for a fresh check of the camera.", "warning")
         elif result is None:
-            state_box("Waiting for assessment", "Camera and model readiness are shown separately.")
+            state_box("Getting ready...", "The first check takes a few seconds.")
         elif not spatial_connected:
-            state_box("Detection active", result.reason)
-        elif not result.score_held and not any(d.label in CHILD_LABELS for d in result.detections):
-            state_box("No reference person detected", "Proximity cannot be assessed without a person in view.")
-        elif not result.score_held and not any(d.label.lower().replace(" ", "_") in DANGER_WEIGHTS for d in result.detections):
-            state_box("No hazard detected", "The model has not detected a supported hazard in this frame.")
+            level_box(result.level, result.reason)
+        elif not result.score_held and not any(label_key(d.label) in CHILD_LABELS for d in result.detections):
+            state_box("No child in view", "Point the camera so the child can be seen.")
+        elif not result.score_held and not any(label_key(d.label) in DANGER_WEIGHTS for d in result.detections):
+            level_box(DangerLevel.SAFE, "No dangerous objects can be seen.")
         else:
-            tone = f"severity-{result.level.name.lower()}"
-            state_box(result.level.name, result.reason or "No explanation provided.", tone)
-            st.caption(f"Danger score: {result.score:.2f}")
+            message = LEVEL_TEXT[result.level][1]
+            if pair is not None and result.level > DangerLevel.SAFE:
+                message = (f"{nice_name(pair['hazard']).capitalize()} is "
+                           f"{DISTANCE_TEXT[pair['zone']]} the child. {message}")
+            level_box(result.level, message)
+        if tech and result is not None and not (error or idle):
+            st.caption(f"Danger score {result.score:.2f} · {result.reason}")
             if result.score_held:
                 st.caption("Recent risk held briefly while the next detection arrives.")
 
     with st.container(border=True, key=f"preview_{prefix}_objects"):
-        panel_title("Detected objects", "objects")
+        panel_title("What the camera sees", "objects")
         if is_demo:
-            state_box("Detector not connected", "Object labels will appear here.", compact=True)
+            state_box("Object detection is off in practice mode", compact=True)
         elif error or stale or idle:
-            state_box("Detections unavailable", "Waiting for a current successful assessment.", compact=True)
+            state_box("Nothing to show yet", compact=True)
         elif result is None:
-            state_box("Waiting for detections", "Objects will appear after processing.", compact=True)
+            state_box("Looking...", "Objects will appear here.", compact=True)
         elif not result.detections:
-            state_box("No objects detected", "An empty result does not establish that the scene is safe.", compact=True)
+            state_box("Nothing recognised", "This does not always mean the area is safe.", compact=True)
         else:
-            # People first (child reference), then hazards from most to least dangerous.
             def role(d):
-                key = d.label.lower().replace(" ", "_")
+                key = label_key(d.label)
                 if key in CHILD_LABELS:
-                    return 0, "Child reference"
-                weight = DANGER_WEIGHTS.get(key)
-                return (1, f"Hazard · severity {weight:.2f}") if weight is not None else (2, "Other object")
+                    return 0, "Child"
+                if key in DANGER_WEIGHTS:
+                    return 1, RISK_TYPE.get(key, "Hazard")
+                return 2, "Not dangerous"
+            seen = set()
             for item in sorted(result.detections, key=lambda d: (role(d)[0], -d.confidence)):
-                depth = "" if item.depth is None else f" · depth {item.depth:.2f}"
-                st.html(
-                    f'<div class="object-row"><b>{escape(item.label.replace("_", " "))}</b>'
-                    f'<span>{escape(role(item)[1])} · {item.confidence:.0%}{depth}</span></div>')
-            if any(item.depth is not None for item in result.detections):
+                name = nice_name(item.label)
+                if not tech and name in seen:              # list each kind of object once
+                    continue
+                seen.add(name)
+                detail = role(item)[1]
+                if tech:
+                    detail += f" · {item.confidence:.0%}" + ("" if item.depth is None else f" · depth {item.depth:.2f}")
+                st.html(f'<div class="object-row"><b>{escape(name.capitalize())}</b><span>{escape(detail)}</span></div>')
+            if tech and any(item.depth is not None for item in result.detections):
                 st.caption("Depth is relative within this frame: 1 = closest to the camera, 0 = farthest.")
+
     with st.container(border=True, key=f"preview_{prefix}_proximity"):
-        panel_title("Proximity assessment", "proximity")
+        panel_title("How close is it?", "proximity")
         if is_demo:
-            state_box("Waiting for spatial analysis", compact=True)
+            state_box("Not available in practice mode", compact=True)
         elif not spatial_connected:
-            state_box("Spatial analysis not connected yet",
-                      "The danger level currently comes from the detected objects only.", compact=True)
-        elif result is not None and not (error or stale or idle):
-            st.write(result.reason or "No spatial explanation provided.")
-            pairs = pair_distances(result.detections)
-            if pairs:
-                fmt = lambda v: "–" if v is None else f"{v:.2f}"
+            state_box("Distance check is not connected", "The level comes from the objects only.", compact=True)
+        elif result is None or error or stale or idle:
+            state_box("Nothing to show yet", compact=True)
+        elif pair is None:
+            state_box("Nothing to measure", "Needs both a child and a hazard in view.", compact=True)
+        else:
+            zone_tone = {"CRITICAL": "severity-high", "WARNING": "severity-medium",
+                         "CAUTION": "severity-low", "SAFE": "severity-safe"}[pair["zone"]]
+            state_box(f"{nice_name(pair['hazard']).capitalize()} is {DISTANCE_TEXT[pair['zone']]} the child",
+                      "Distance is estimated from the camera picture.", zone_tone, compact=True)
+            if tech:
+                fmt = lambda v: "-" if v is None else f"{v:.2f}"
                 st.dataframe(
                     [{"Child": p["child"], "Hazard": p["hazard"],
                       "Child depth": fmt(p["child_depth"]), "Hazard depth": fmt(p["hazard_depth"]),
                       "Depth diff": fmt(p["depth_diff"]),
-                      "Distance": f'{p["distance"]:.2f}× height', "Zone": p["zone"]}
-                     for p in pairs],
+                      "Distance": f'{p["distance"]:.2f}x height', "Zone": p["zone"]}
+                     for p in pair_distances(result.detections)],
                     hide_index=True, width="stretch")
-                st.caption("Every child–hazard pair, closest first. Distance combines the on-screen "
-                           "gap and the depth difference; the danger score uses the closest pair.")
-            status = result.depth_status
-            if status.startswith("Depth unavailable"):
-                status = "Depth unavailable; image-plane distance only (details in Settings)."
-            st.caption(status)
-            st.caption("Relative distances use the reference person's box height, not metres. A person detection does not identify age.")
-        else:
-            state_box("Proximity unavailable", "Waiting for current spatial analysis.", compact=True)
+                st.caption("Every child-hazard pair, closest first. Distance combines the on-screen "
+                           "gap and the depth difference.")
+                st.caption(result.depth_status)
+                st.caption("Relative distances use the reference person's box height, not metres. "
+                           "A person detection does not identify age.")
 
 
 @st.cache_resource
@@ -562,6 +640,10 @@ shield_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 38"><path 
 st.html(f'<div class="brand"><span class="brand-shield"><img src="{svg_data_uri(shield_svg)}" width="23" height="27" alt="Shield logo"></span>Child Safety Monitor</div>')
 navigation = st.container(key="preview_navigation")
 with navigation:
+    with st.container(key="preview_guide"):
+        if st.button("Guide", icon=":material/help:", use_container_width=True,
+                     help="Step-by-step tutorial on how to use the app"):
+            ss.tour_open, ss.tour_step = True, 0
     with st.container(key="preview_settings"):
         with st.popover("Settings", icon=":material/settings:", use_container_width=True):
             st.subheader("Monitoring settings")
@@ -593,6 +675,9 @@ with navigation:
                                       "(highest danger, then most confident detections) stays on screen "
                                       "until the next period ends. A higher danger level still shows at once.")
             show_overlay = st.checkbox("Draw detection overlay", value=True, disabled=is_demo, key="preview_overlay")
+            show_tech = st.toggle("Show technical details", value=False, key="preview_tech",
+                                  help="Scores, confidences and distances for testing and debugging. "
+                                       "Caregivers normally leave this off.")
             show_depth = st.toggle("Show depth map", value=False, disabled=is_demo, key="preview_show_depth",
                                    help="Coloured relative depth (brighter = closer), like pressing d in "
                                         "the live test script. Shown under the live camera and tested images.")
@@ -610,6 +695,94 @@ with navigation:
     tab_live, tab_test, tab_video, tab_history, tab_telegram = st.tabs(
         ["Live Monitoring", "Test Image", "Test Video", "Alert History", "Telegram"],
         key="main_tabs", on_change="rerun")   # lets "Configure Telegram" switch tabs
+
+
+# ---------------- guided tutorial ----------------
+def tour_steps():
+    """(title, body) for each tutorial step; uses the current Settings values."""
+    legend = "".join(
+        f'<b class="severity-{lvl.name.lower()}" style="background:{lvl.color}22;border:1px solid {lvl.color}">'
+        f'{LEVEL_TEXT[lvl][0]}</b><span>{LEVEL_TEXT[lvl][1]}</span>' for lvl in DangerLevel)
+    return [
+        ("Welcome to Child Safety Monitor",
+         "This app watches a camera and warns you when a child is near something dangerous:\n\n"
+         "- **Batteries** and **button batteries**\n- **Coins** and **small objects** a child could choke on\n"
+         "- **Sharp objects** such as knives and scissors\n- **Medicine**\n\n"
+         "This short guide shows you how to set it up. It takes about two minutes."),
+        ("Step 1 · Set up your home",
+         "Alerts are sent to your family on **Telegram**.\n\n"
+         "1. Open the **Telegram** tab at the top.\n"
+         "2. Type a name for your home and press **Create home**. A *Living room* is added for you, "
+         "and you can add more rooms, one for each camera.\n"
+         "3. **Bookmark this page.** The page link holds your private home key, so the bookmark brings you back.\n"
+         "4. Send the **invite link** to family members. They open it in Telegram and press **Start**."),
+        ("Step 2 · Start the camera",
+         "1. Go to the **Live Monitoring** tab.\n"
+         "2. Under **Video input**, choose your camera.\n"
+         "3. Press **Start monitoring**, and allow camera access if your browser asks.\n\n"
+         "**Tip:** place the camera so that both the child and the area around them are visible. "
+         "The app needs to see the child to tell how close a dangerous object is."),
+        ("Step 3 · Read the result",
+         "The **Assessment** panel tells you how safe things are right now:"
+         f'<div class="tour-legend">{legend}</div>'
+         "- **What the camera sees** lists the objects found and why they are dangerous.\n"
+         "- **How close is it?** says how near the object is to the child.\n\n"
+         f"The result changes at most every **{update_s:g} seconds** so you have time to read it. "
+         "If the danger goes **up**, it changes straight away."),
+        ("Step 4 · Turn on alerts",
+         "1. Below the Assessment panel, choose **This camera's room**.\n"
+         "2. Switch on **Send Telegram alerts**.\n\n"
+         f"You get a Telegram message with a photo when the level reaches **{LEVEL_TEXT[min_level][0]}** "
+         f"and stays there for **{confirm_s:g} seconds**. After an alert, the app waits "
+         f"**{cooldown} seconds** before sending another one for the same room. "
+         "You can change all of this in **Settings**."),
+        ("You're all set",
+         "A few more things you can do:\n\n"
+         "- **Test Image** and **Test Video**: check a photo or video clip without a live camera.\n"
+         "- **Alert History**: see every alert and whether it was delivered.\n"
+         "- **Settings** (top right): camera quality, how often the result updates, and when to alert. "
+         "Turn on *Show technical details* if you want to see the scores.\n\n"
+         "You can open this guide again at any time with the **Guide** button at the top."),
+    ]
+
+
+def close_tour():
+    ss.tour_open = False
+
+
+@st.dialog("Getting started", width="large", on_dismiss=close_tour)
+def tutorial():
+    steps = tour_steps()
+    step = min(ss.get("tour_step", 0), len(steps) - 1)
+    title, body = steps[step]
+    bars = "".join(f'<span class="{"done" if i <= step else ""}"></span>' for i in range(len(steps)))
+    st.html(f'<div class="tour-steps">{bars}</div>')
+    st.caption(f"Step {step + 1} of {len(steps)}")
+    st.subheader(title)
+    st.markdown(body, unsafe_allow_html=True)
+    last = step == len(steps) - 1
+
+    def go(delta):
+        ss.tour_step = step + delta
+
+    back, skip, nxt = st.columns(3)
+    back.button("Back", disabled=step == 0, use_container_width=True, key="tour_back",
+                on_click=go, args=(-1,))
+    if not last and skip.button("Skip guide", type="tertiary", use_container_width=True, key="tour_skip",
+                                on_click=close_tour):
+        st.rerun()                                     # full rerun closes the dialog
+    if last:
+        if nxt.button("Finish", type="primary", use_container_width=True, key="tour_next", on_click=close_tour):
+            st.rerun()
+    else:
+        nxt.button("Next", type="primary", use_container_width=True, key="tour_next", on_click=go, args=(1,))
+
+
+# New visitors (no home yet) see the guide once per session; anyone can reopen it.
+ss.setdefault("tour_open", not home)
+ss.setdefault("tour_step", 0)
+if ss.tour_open:
+    tutorial()
 
 
 def open_telegram_tab():
@@ -764,7 +937,8 @@ with tab_live:
             img = cv2.resize(img, (thumb_w, h))
             chosen = c is best
             cv2.rectangle(img, (0, h - 26), (thumb_w, h), (16, 34, 64), -1)
-            label = f"#{i}  score {c.result.score:.2f}" + ("  PICKED" if chosen else "")
+            label = (f"#{i}  score {c.result.score:.2f}" if show_tech
+                     else f"#{i}  {LEVEL_TEXT[c.result.level][0]}") + ("  PICKED" if chosen else "")
             cv2.putText(img, label, (6, h - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
                         (255, 255, 255), 1, cv2.LINE_AA)
             border = (142, 136, 16) if chosen else (230, 225, 220)   # teal (BGR) vs light grey
@@ -788,15 +962,15 @@ with tab_live:
                 state_box("No frames analysed yet",
                           "Start monitoring. The frame used for the assessment will appear here.", compact=True)
                 return
-            shown = draw_result(best.frame, best.result, banner=not is_demo) if show_overlay and not is_demo else best.frame
+            shown = draw_result(best.frame, best.result, banner=show_tech) if show_overlay and not is_demo else best.frame
             pos = candidates.index(best) + 1
             st.image(shown, channels="BGR", width="stretch",
-                     caption=f"Frame #{pos} of {len(candidates)} compared · {best.result.level.name} "
-                             f"({best.result.score:.2f}) · scanning next round: {scanning} frame(s)")
+                     caption=(f"Frame #{pos} of {len(candidates)} compared · {best.result.level.name} "
+                              f"({best.result.score:.2f}) · scanning next round: {scanning} frame(s)") if show_tech
+                     else f"The most worrying picture from the last {update_s:g} seconds ({len(candidates)} checked).")
             if len(candidates) > 1:
                 st.image(candidate_strip(candidates, best), channels="BGR", width="stretch",
-                         caption="Compared frames, oldest to newest. Picked: highest danger score, "
-                                 "then most confident detections.")
+                         caption="Pictures checked, oldest to newest. The one with the highest risk is shown above.")
 
     @st.fragment(run_every=1.0)
     def depth_preview():

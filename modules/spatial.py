@@ -68,6 +68,13 @@ DANGER_WEIGHTS = {
     "liquid_medicine": 0.95,   # poisoning risk, especially if flavored/syrup
     "pill_bottle": 0.9,        # risk depends on whether it's open/childproofed
     "pill_packet": 0.95,       # blister packs are easy for kids to open, high poisoning risk
+    # Current final_best.pt merges the classes above into 7 (IDs 0-6):
+    #   0 battery  1 coin_battery  2 coin  3 small_object  4 pen  5 sharp  6 medicine
+    # Every class the model outputs MUST be listed here, or it is treated as
+    # "not a hazard" and scores 0 (test_hazard_pipeline checks this).
+    "small_object": 0.75,     # dice, marbles, bottle caps, small toys - choking
+    "sharp": 1.0,             # knives, scissors - laceration
+    "medicine": 0.95,         # syrup, pill bottles, blister packs - poisoning
 }
 DEFAULT_HAZARD_WEIGHT = 0.5
 
