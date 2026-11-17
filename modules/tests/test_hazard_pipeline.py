@@ -58,3 +58,17 @@ def test_depth_difference_lowers_the_score():
     depth[175:325, 150:250] = .03                            # person far away
     depth[215:245, 215:245] = .9                             # hazard close to the camera
     assert clf.predict_with_depth(FRAME, depth).score < clf.predict_with_depth(FRAME, None).score
+
+
+def test_every_trained_class_has_a_danger_weight():
+    """A class missing from DANGER_WEIGHTS is silently ignored (score 0)."""
+    import pytest
+    from modules.detector import LABEL_ALIASES, find_weights
+    from modules.spatial import DANGER_WEIGHTS
+
+    weights = find_weights()
+    if not weights:
+        pytest.skip("weights/final_best.pt not present")
+    from ultralytics import YOLO
+    names = [LABEL_ALIASES.get(n, n).lower().replace(" ", "_") for n in YOLO(weights).names.values()]
+    assert [n for n in names if n not in DANGER_WEIGHTS] == []

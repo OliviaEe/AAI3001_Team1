@@ -68,6 +68,13 @@ DANGER_WEIGHTS = {
     "liquid_medicine": 0.95,   # poisoning risk, especially if flavored/syrup
     "pill_bottle": 0.9,        # risk depends on whether it's open/childproofed
     "pill_packet": 0.95,       # blister packs are easy for kids to open, high poisoning risk
+    # Current final_best.pt merges the classes above into 7 (IDs 0-6):
+    #   0 battery  1 coin_battery  2 coin  3 small_object  4 pen  5 sharp  6 medicine
+    # Every class the model outputs MUST be listed here, or it is treated as
+    # "not a hazard" and scores 0 (test_hazard_pipeline checks this).
+    "small_object": 0.75,     # dice, marbles, bottle caps, small toys - choking
+    "sharp": 1.0,             # knives, scissors - laceration
+    "medicine": 0.95,         # syrup, pill bottles, blister packs - poisoning
 }
 DEFAULT_HAZARD_WEIGHT = 0.5
 
@@ -145,6 +152,32 @@ def depth_adjusted_distance(child: Detection, hazard: Detection) -> tuple[float,
         depth_diff = max(0.0, depth_diff - ARM_REACH_DEPTH)
     effective_dist = math.sqrt(norm_dist ** 2 + (DEPTH_DIFF_WEIGHT * depth_diff) ** 2)
     return norm_dist, depth_diff, effective_dist
+
+
+def pair_distances(detections: list[Detection]) -> list[dict]:
+    """Every child-hazard pair with its depths, distance and zone, closest
+    first. Same maths as SpatialAnalyzer.assess(); used to list each pair in
+    the UI, so two children near one hazard are both shown."""
+    detections = [d for d in detections if d.bbox is not None]
+    children = [d for d in detections if _label(d) in CHILD_LABELS]
+    hazards = [d for d in detections if _label(d) not in CHILD_LABELS
+               and _label(d) in DANGER_WEIGHTS]
+    pairs = []
+    for ci, child in enumerate(children, start=1):
+        for hz in hazards:
+            planar, depth_diff, effective = depth_adjusted_distance(child, hz)
+            pairs.append({
+                "child": f"Person {ci}",
+                "hazard": hz.label.replace("_", " "),
+                "child_depth": getattr(child, "depth", None),
+                "hazard_depth": getattr(hz, "depth", None),
+                "depth_diff": depth_diff,
+                "planar": planar,
+                "distance": effective,
+                "zone": _zone(effective),
+            })
+    pairs.sort(key=lambda p: p["distance"])
+    return pairs
 
 
 class ScoreHold:

@@ -29,7 +29,7 @@ from streamlit_webrtc import VideoProcessorBase
 from modules.classifier import BaseClassifier, ClassificationResult
 from modules.spatial import CHILD_LABELS
 
-MAX_CANDIDATES = 10        # most analysed frames kept for best-frame selection
+MAX_CANDIDATES = 15        # most analysed frames kept per round (the newest ones)
 
 
 @dataclass
@@ -59,17 +59,55 @@ def pick_best(candidates: list[Candidate]) -> Candidate | None:
     return best
 
 
+class RoundSelector:
+    """Turns a stream of per-frame results into a steady, readable one.
+
+    Analysed frames are collected for `period` seconds (one round); then the best
+    frame of the round becomes the shown result and stays until the next round
+    ends. A higher danger level replaces it at once so a warning is never delayed.
+    """
+
+    def __init__(self, period: float = 2.0):
+        self.period = period
+        self.shown: Candidate | None = None
+        self.shown_round: list[Candidate] = []      # frames compared for `shown`
+        self._pending: deque[Candidate] = deque(maxlen=MAX_CANDIDATES)
+        self._round_start: float | None = None
+
+    def add(self, c: Candidate) -> bool:
+        """Add one analysed frame; True when the shown result changed."""
+        if self._round_start is None:
+            self._round_start = c.t
+        self._pending.append(c)
+        rises = self.shown is not None and c.result.level > self.shown.result.level
+        if self.shown is not None and not rises and c.t - self._round_start < self.period:
+            return False
+        self.shown_round = list(self._pending)
+        self.shown = pick_best(self.shown_round)
+        self._pending.clear()
+        self._round_start = c.t                     # next round is timed from this update
+        return True
+
+    def pending_count(self) -> int:
+        return len(self._pending)
+
+
 def draw_result(img, result: ClassificationResult, banner: bool = True):
     """Boxes from the spatial/model part + a coloured danger banner.
     Shared by the live camera and the image tester in app.py."""
     img = img.copy()
+    person_no = 0
     for d in result.detections:
         if d.bbox:
             # Blue = person (child reference), yellow = hazard.
-            color = (255, 160, 0) if d.label in CHILD_LABELS else (0, 255, 255)
+            is_child = d.label.lower().replace(" ", "_") in CHILD_LABELS
+            color = (255, 160, 0) if is_child else (0, 255, 255)
             x1, y1, x2, y2 = d.bbox
             cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
             text = f"{d.label} {d.confidence:.2f}"
+            if is_child:                      # P1, P2 ... match "Person 1" in the side panel
+                person_no += 1
+                text = f"P{person_no} {text}"
             if d.depth is not None:           # 0-1 relative depth, 1 = closest
                 text += f" d={d.depth:.2f}"
             cv2.putText(img, text, (x1, max(y1 - 6, 12)),
@@ -95,7 +133,7 @@ class CameraProcessor(VideoProcessorBase):
         self._frame_id = 0
         self._latest_frame = None             # newest frame as BGR numpy (shared across threads)
         self._latest_result: ClassificationResult | None = None
-        self._candidates: deque[Candidate] = deque(maxlen=MAX_CANDIDATES)
+        self.selector = RoundSelector()       # app.py sets selector.period
         self.infer_fps = 0.0                  # measured model runs per second
         self.latency_ms = 0.0                 # time of the last predict() call
         self.error: str | None = None         # last exception from the model, shown in the UI
@@ -114,12 +152,11 @@ class CameraProcessor(VideoProcessorBase):
         with self._lock:
             return None if self._latest_frame is None else self._latest_frame.copy()
 
-    def recent_candidates(self, n: int, max_age: float = 5.0) -> list[Candidate]:
-        """Up to the last `n` analysed frames (oldest first), skipping stale ones."""
-        cutoff = time.monotonic() - max_age
+    def shown(self) -> tuple[Candidate | None, list[Candidate], int]:
+        """(chosen frame, frames it was picked from, frames scanned so far this round)."""
         with self._lock:
-            items = list(self._candidates)[-max(n, 1):]
-        return [c for c in items if c.t >= cutoff]
+            sel = self.selector
+            return sel.shown, list(sel.shown_round), sel.pending_count()
 
     # ---- called by webrtc for every frame (runs in a worker thread) ----
     def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
@@ -160,7 +197,7 @@ class CameraProcessor(VideoProcessorBase):
             with self._lock:
                 self._latest_result = result
                 # recv() replaces _latest_frame with a new array, so keeping a reference is safe.
-                self._candidates.append(Candidate(time.monotonic(), frame, result))
+                self.selector.add(Candidate(time.monotonic(), frame, result))
             last_id = fid
 
             now = time.perf_counter()

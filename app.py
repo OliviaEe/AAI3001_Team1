@@ -21,17 +21,24 @@ os.environ.setdefault("KMP_BLOCKTIME", "0")
 
 import cv2
 import numpy as np
+# Load pyarrow (used by st.dataframe / charts) before the models: importing it for the
+# first time after torch + transformers are running crashed the process (access violation).
+import pyarrow  # noqa: F401
 import streamlit as st
 from streamlit_webrtc import RTCConfiguration, WebRtcMode, webrtc_streamer
 
-from modules.camera import MAX_CANDIDATES, CameraProcessor, analyse_video, draw_result, pick_best
+from modules.camera import CameraProcessor, analyse_video, draw_result
 from modules.classifier import (
     BaseClassifier, ClassificationResult, DangerLevel, DummyClassifier, get_classifier,
 )
 from modules.notifier import TelegramNotifier
 from modules.subscriptions import SubscriptionStore, start_poller
-from modules.spatial import CHILD_LABELS, DANGER_WEIGHTS, ScoreHold
+from modules.spatial import CHILD_LABELS, DANGER_WEIGHTS, MAX_NORM_DIST, ScoreHold, pair_distances
 from modules.spatial_pipeline import MAX_DEPTH_AGE, colorize_depth
+
+# Zone -> (icon, plain words) for the caregiver-facing proximity cards.
+ZONE_DISPLAY = {"CRITICAL": ("🔴", "within reach of"), "WARNING": ("🟠", "close to"),
+                "CAUTION": ("🟡", "near"), "SAFE": ("🟢", "far from")}
 
 
 st.set_page_config(page_title="Child Safety Monitor", page_icon="🛡️", layout="wide")
@@ -120,10 +127,27 @@ h3 { font-size: 1.1rem !important; }
 .camera-placeholder .camera-symbol { font-size: 42px; margin-bottom: 8px; }
 .camera-placeholder strong { font-size: 20px; color: #334b66; }
 .camera-placeholder p { font-size: 14px; color: #64748b; margin-top: 8px; }
+.risk-meter { display: flex; gap: 5px; margin: 12px auto 2px; max-width: 240px; }
+.risk-meter span { flex: 1; height: 8px; border-radius: 4px; background: #d9e1ea; }
+.risk-meter span.on { background: var(--meter); }
+.risk-meter-labels { display: flex; justify-content: space-between; max-width: 240px; margin: 0 auto;
+  font-size: 11px; color: #6b7c93; }
 .object-row { padding: 10px 0; border-bottom: 1px solid #e4eaf1; display: flex; justify-content: space-between; }
 .object-row span { color: #64748b; }
+.risk-card { border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; border: 1px solid; }
+.risk-card .risk-head { font-weight: 700; font-size: 15px; }
+.risk-card .risk-stats { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 4px; font-size: 13px; color: #475569; }
+.risk-card .risk-stats b { font-size: 16px; color: #102240; }
+.risk-card .risk-more { margin-top: 4px; font-size: 12px; color: #64748b; }
+.risk-card.risk-top { padding: 14px 16px; border-width: 2px; }
+.risk-card.risk-top .risk-head { font-size: 18px; }
+.risk-card.risk-top .risk-stats b { font-size: 20px; }
+.risk-critical { background: #ffebeb; border-color: #efaaaa; } .risk-critical .risk-head { color: #a51f1f; }
+.risk-warning { background: #fff0e0; border-color: #f4b16a; } .risk-warning .risk-head { color: #9a4600; }
+.risk-caution { background: #fff7d6; border-color: #ead27b; } .risk-caution .risk-head { color: #806000; }
+.risk-safe { background: #e9f8ef; border-color: #9fd8b5; } .risk-safe .risk-head { color: #126c40; }
 .footer { margin-top: 25px; text-align: right; font-size: 12px; color: #6b7c93; }
-/* Desktop composition follows the reference; the camera scales with viewport height. */
+/* The stopped preview stays compact; live video follows its natural aspect ratio. */
 :root { --camera-height: clamp(220px, calc(100dvh - 435px), 650px); }
 [data-testid="stMainBlockContainer"] { max-width: none !important; padding: 12px 2.4vw 8px !important; }
 [data-testid="stVerticalBlock"] { gap: 10px; }
@@ -137,7 +161,16 @@ h3 { font-size: 1.1rem !important; }
 }
 .st-key-preview_settings [data-testid="stPopoverButton"] { height: 46px; border-radius: 8px; }
 .st-key-preview_settings [data-testid="stPopoverButton"] > div > div[aria-hidden="true"] { display: none; }
-[data-testid="stTabs"] [role="tablist"] { padding-right: 145px; }
+.st-key-preview_navigation > [data-testid="stLayoutWrapper"]:has(.st-key-preview_guide) {
+  position: absolute; right: 136px; top: 8px; width: 110px; z-index: 20;
+}
+.st-key-preview_guide button { height: 46px; border-radius: 8px; }
+.tour-steps { display: flex; gap: 6px; margin: 0 0 14px; }
+.tour-steps span { flex: 1; height: 6px; border-radius: 3px; background: #d9e1ea; }
+.tour-steps span.done { background: #10888e; }
+.tour-legend { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; margin: 6px 0 12px; }
+.tour-legend b { padding: 4px 10px; border-radius: 6px; text-align: center; font-size: 14px; }
+[data-testid="stTabs"] [role="tablist"] { padding-right: 265px; }
 [data-testid="stTabPanel"] { padding-top: 12px; }
 h1 { font-family: Arial, sans-serif; font-size: 32px !important; margin: 0 !important; padding: 0 0 4px !important; }
 .live-heading { display: flex; align-items: center; gap: 22px; min-height: 48px; flex-wrap: wrap; }
@@ -146,8 +179,8 @@ h1 { font-family: Arial, sans-serif; font-size: 32px !important; margin: 0 !impo
 .camera-card-header strong { font-size: 17px; }
 .camera-view-tag { font-size: 12px; background: #e8edf3; color: #4b5f7b; padding: 6px 12px; border-radius: 7px; }
 .st-key-preview_camera_card { background: white; }
-.st-key-preview_video_frame { position: relative; height: var(--camera-height); min-height: var(--camera-height); overflow: hidden; border-radius: 8px; }
-.st-key-preview_video_frame iframe { height: var(--camera-height) !important; }
+.st-key-preview_video_frame { position: relative; overflow: hidden; border-radius: 8px; }
+.st-key-preview_video_frame iframe { display: block; width: 100%; }
 .st-key-preview_video_frame:has(.camera-placeholder) iframe { position: absolute; opacity: 0; pointer-events: none; }
 .camera-placeholder { height: var(--camera-height); min-height: 0; margin: 0; border: 0; }
 .panel-title { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; }
@@ -389,79 +422,193 @@ def queue_alert(result, frame, room_id):
     notifier.send_alert(result, frame, room_id, store).add_done_callback(done)
 
 
+# ---- plain-language wording for caregivers (numbers only under "technical details") ----
+LEVEL_TEXT = {
+    DangerLevel.SAFE: ("Safe", "Nothing dangerous is near the child."),
+    DangerLevel.LOW: ("Low risk", "A hazard is in view, but not near the child."),
+    DangerLevel.MEDIUM: ("Be careful", "A hazard is getting close to the child. Keep an eye on them."),
+    DangerLevel.HIGH: ("Danger", "A hazard is within the child's reach. Check on them now."),
+}
+DISTANCE_TEXT = {zone: words for zone, (_, words) in ZONE_DISPLAY.items()}
+DISPLAY_NAMES = {"coin_battery": "button battery", "small_object": "small object", "sharp": "sharp object",
+                 "liquid_medicine": "medicine syrup", "pill_bottle": "pill bottle", "pill_packet": "pill packet",
+                 "small_toy": "small toy", "pencap": "pen cap", "bottlecap": "bottle cap"}
+RISK_TYPE = {
+    "battery": "Swallowing / burn risk", "coin_battery": "Swallowing / burn risk",
+    "coin": "Choking risk", "small_object": "Choking risk", "marble": "Choking risk", "dice": "Choking risk",
+    "small_toy": "Choking risk", "bottlecap": "Choking risk", "pencap": "Choking risk", "pen": "Poking risk",
+    "sharp": "Cut risk", "knife": "Cut risk", "scissors": "Cut risk",
+    "medicine": "Poisoning risk", "liquid_medicine": "Poisoning risk", "pill_bottle": "Poisoning risk",
+    "pill_packet": "Poisoning risk",
+}
+
+
+def label_key(label):
+    return label.lower().replace(" ", "_")
+
+
+def nice_name(label):
+    key = label_key(label)
+    return DISPLAY_NAMES.get(key, key.replace("_", " "))
+
+
+def pair_risk(p):
+    """Danger of one child-hazard pair: hazard weight x closeness (same maths as spatial.py)."""
+    weight = DANGER_WEIGHTS.get(label_key(p["hazard"]), 0.5)
+    return weight * max(0.0, 1.0 - p["distance"] / MAX_NORM_DIST)
+
+
+def worst_pair(detections):
+    """The child-hazard pair that drives the danger level."""
+    pairs = pair_distances(detections)
+    return max(pairs, key=pair_risk) if pairs else None
+
+
+def person_cards(detections):
+    """One entry per person in danger, most dangerous first:
+    {"pair": their most dangerous pair, "others": other hazards near them}."""
+    per_child = {}
+    for p in pair_distances(detections):
+        if p["zone"] == "SAFE":
+            continue
+        card = per_child.setdefault(p["child"], {"pair": p, "others": 0})
+        if card["pair"] is not p:
+            card["others"] += 1
+            if pair_risk(p) > pair_risk(card["pair"]):
+                card["pair"] = p
+    return sorted(per_child.values(), key=lambda c: -pair_risk(c["pair"]))
+
+
+def risk_card_html(card, top, tech):
+    p = card["pair"]
+    icon, words = ZONE_DISPLAY[p["zone"]]
+    others = card["others"]
+    more = (f'<div class="risk-more">+ {others} other dangerous object{"s" if others > 1 else ""} nearby</div>'
+            if others else "")
+    if tech:
+        depth = "-" if p["child_depth"] is None else f'{p["child_depth"]:.2f}'
+        stats = (f'<div class="risk-stats"><span>Distance <b>{p["distance"]:.2f}</b></span>'
+                 f'<span>Depth <b>{depth}</b></span></div>')
+    else:
+        stats = '<div class="risk-stats"><span><b>Touching</b></span></div>' if p["distance"] < 0.01 else ""
+    return (f'<div class="risk-card risk-{p["zone"].lower()}{" risk-top" if top else ""}">'
+            f'<div class="risk-head">{icon} {escape(p["child"])} is {words} the {escape(nice_name(p["hazard"]))}</div>'
+            f'{stats}{more}</div>')
+
+
+def toggle_show_all(key):
+    ss[key] = not ss.get(key, False)
+
+
+def level_box(level, message):
+    """Big plain-language level with a 4-step colour meter instead of a score."""
+    title, _ = LEVEL_TEXT[level]
+    bars = "".join(f'<span class="{"on" if i <= int(level) else ""}"></span>' for i in range(4))
+    st.html(f'<div class="state-box severity-{level.name.lower()}"><strong>{escape(title)}</strong>'
+            f'<p>{escape(message)}</p><div class="risk-meter" style="--meter:{level.color}">{bars}</div>'
+            '<div class="risk-meter-labels"><span>Safe</span><span>Danger</span></div></div>')
+
+
 def render_assessment(result=None, error=None, stale=False, idle=False, prefix="live"):
+    tech = show_tech
+    pair = worst_pair(result.detections) if result is not None and spatial_connected else None
     with st.container(border=True, key=f"preview_{prefix}_assessment"):
         panel_title("Assessment", "assessment")
         if error:
-            state_box("Assessment unavailable", "Processing failed. No current danger assessment.", "error")
-            with st.expander("Error details"):
-                st.text(error)
+            state_box("Something went wrong", "The check failed, so there is no result right now.", "error")
+            if tech:
+                with st.expander("Error details"):
+                    st.text(error)
         elif is_demo:
             if result is None:
-                state_box("Simulated assessment", "Start monitoring or analyse an image to generate a test result.")
+                state_box("Practice mode", "Start the camera or test an image to see a sample result.")
             else:
-                tone = f"severity-{result.level.name.lower()}"
-                state_box(f"Simulated level: {result.level.name}", f"Random score: {result.score:.2f}", tone)
+                level_box(result.level, "Practice mode: this result is random, not a real check.")
         elif idle:
-            state_box("Monitoring stopped", "Start the camera to request an assessment.")
+            state_box("Camera is off", "Press Start monitoring to begin watching.")
         elif stale:
-            state_box("Assessment outdated", "Waiting for a fresh result. Previous result is hidden.", "warning")
+            state_box("Updating...", "Waiting for a fresh check of the camera.", "warning")
         elif result is None:
-            state_box("Waiting for assessment", "Camera and model readiness are shown separately.")
+            state_box("Getting ready...", "The first check takes a few seconds.")
         elif not spatial_connected:
-            state_box("Detection active", result.reason)
-        elif not result.score_held and not any(d.label in CHILD_LABELS for d in result.detections):
-            state_box("No reference person detected", "Proximity cannot be assessed without a person in view.")
-        elif not result.score_held and not any(d.label.lower().replace(" ", "_") in DANGER_WEIGHTS for d in result.detections):
-            state_box("No hazard detected", "The model has not detected a supported hazard in this frame.")
+            level_box(result.level, result.reason)
+        elif not result.score_held and not any(label_key(d.label) in CHILD_LABELS for d in result.detections):
+            state_box("No child in view", "Point the camera so the child can be seen.")
+        elif not result.score_held and not any(label_key(d.label) in DANGER_WEIGHTS for d in result.detections):
+            level_box(DangerLevel.SAFE, "No dangerous objects can be seen.")
         else:
-            tone = f"severity-{result.level.name.lower()}"
-            state_box(result.level.name, result.reason or "No explanation provided.", tone)
-            st.caption(f"Danger score: {result.score:.2f}")
+            message = LEVEL_TEXT[result.level][1]
+            if pair is not None and result.level > DangerLevel.SAFE:
+                message = (f"{nice_name(pair['hazard']).capitalize()} is "
+                           f"{DISTANCE_TEXT[pair['zone']]} the child. {message}")
+            level_box(result.level, message)
+        if tech and result is not None and not (error or idle):
+            st.caption(f"Danger score {result.score:.2f} · {result.reason}")
             if result.score_held:
                 st.caption("Recent risk held briefly while the next detection arrives.")
 
     with st.container(border=True, key=f"preview_{prefix}_objects"):
-        panel_title("Detected objects", "objects")
+        panel_title("What the camera sees", "objects")
         if is_demo:
-            state_box("Detector not connected", "Object labels will appear here.", compact=True)
+            state_box("Object detection is off in practice mode", compact=True)
         elif error or stale or idle:
-            state_box("Detections unavailable", "Waiting for a current successful assessment.", compact=True)
+            state_box("Nothing to show yet", compact=True)
         elif result is None:
-            state_box("Waiting for detections", "Objects will appear after processing.", compact=True)
+            state_box("Looking...", "Objects will appear here.", compact=True)
         elif not result.detections:
-            state_box("No objects detected", "An empty result does not establish that the scene is safe.", compact=True)
+            state_box("Nothing recognised", "This does not always mean the area is safe.", compact=True)
         else:
-            # People first (child reference), then hazards from most to least dangerous.
             def role(d):
-                key = d.label.lower().replace(" ", "_")
+                key = label_key(d.label)
                 if key in CHILD_LABELS:
-                    return 0, "Child reference"
-                weight = DANGER_WEIGHTS.get(key)
-                return (1, f"Hazard · severity {weight:.2f}") if weight is not None else (2, "Other object")
+                    return 0, "Child"
+                if key in DANGER_WEIGHTS:
+                    return 1, RISK_TYPE.get(key, "Hazard")
+                return 2, "Not dangerous"
+            seen = set()
             for item in sorted(result.detections, key=lambda d: (role(d)[0], -d.confidence)):
-                depth = "" if item.depth is None else f" · depth {item.depth:.2f}"
-                st.html(
-                    f'<div class="object-row"><b>{escape(item.label.replace("_", " "))}</b>'
-                    f'<span>{escape(role(item)[1])} · {item.confidence:.0%}{depth}</span></div>')
-            if any(item.depth is not None for item in result.detections):
+                name = nice_name(item.label)
+                if not tech and name in seen:              # list each kind of object once
+                    continue
+                seen.add(name)
+                detail = role(item)[1]
+                if tech:
+                    detail += f" · {item.confidence:.0%}" + ("" if item.depth is None else f" · depth {item.depth:.2f}")
+                st.html(f'<div class="object-row"><b>{escape(name.capitalize())}</b><span>{escape(detail)}</span></div>')
+            if tech and any(item.depth is not None for item in result.detections):
                 st.caption("Depth is relative within this frame: 1 = closest to the camera, 0 = farthest.")
+
     with st.container(border=True, key=f"preview_{prefix}_proximity"):
-        panel_title("Proximity assessment", "proximity")
+        panel_title("How close is it?", "proximity")
         if is_demo:
-            state_box("Waiting for spatial analysis", compact=True)
+            state_box("Not available in practice mode", compact=True)
         elif not spatial_connected:
-            state_box("Spatial analysis not connected yet",
-                      "The danger level currently comes from the detected objects only.", compact=True)
-        elif result is not None and not (error or stale or idle):
-            st.write(result.reason or "No spatial explanation provided.")
-            status = result.depth_status
-            if status.startswith("Depth unavailable"):
-                status = "Depth unavailable; image-plane distance only (details in Settings)."
-            st.caption(status)
-            st.caption("Relative distances use the reference person's box height, not metres. A person detection does not identify age.")
+            state_box("Distance check is not connected", "The level comes from the objects only.", compact=True)
+        elif result is None or error or stale or idle:
+            state_box("Nothing to show yet", compact=True)
+        elif pair is None:
+            state_box("Nothing to measure", "Needs both a child and a hazard in view.", compact=True)
         else:
-            state_box("Proximity unavailable", "Waiting for current spatial analysis.", compact=True)
+            cards = person_cards(result.detections)
+            if not cards:
+                st.html('<div class="risk-card risk-safe"><div class="risk-head">'
+                        '✅ No child is near a dangerous object</div></div>')
+            show_key = f"preview_{prefix}_prox_all"
+            show_all = ss.get(show_key, False)
+            # Default: only the most dangerous person; "Show all" lists everyone in danger.
+            for i, card in enumerate(cards if show_all else cards[:1]):
+                st.html(risk_card_html(card, top=i == 0, tech=tech))
+            if len(cards) > 1:
+                st.button(f"Hide others" if show_all else f"Show all ({len(cards)} people in danger)",
+                          key=f"{show_key}_btn", type="tertiary", icon=":material/group:",
+                          on_click=toggle_show_all, args=(show_key,))
+            if tech:
+                status = result.depth_status
+                if status.startswith("Depth unavailable"):
+                    status = "Depth unavailable; image-plane distance only (details in Settings)."
+                st.caption(status)
+                st.caption("Distance is in the person's box heights, not metres. "
+                           "A person detection does not identify age.")
 
 
 @st.cache_resource
@@ -550,6 +697,10 @@ shield_svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 38"><path 
 st.html(f'<div class="brand"><span class="brand-shield"><img src="{svg_data_uri(shield_svg)}" width="23" height="27" alt="Shield logo"></span>Child Safety Monitor</div>')
 navigation = st.container(key="preview_navigation")
 with navigation:
+    with st.container(key="preview_guide"):
+        if st.button("Guide", icon=":material/help:", use_container_width=True,
+                     help="Step-by-step tutorial on how to use the app"):
+            ss.tour_open, ss.tour_step = True, 0
     with st.container(key="preview_settings"):
         with st.popover("Settings", icon=":material/settings:", use_container_width=True):
             st.subheader("Monitoring settings")
@@ -576,11 +727,14 @@ with navigation:
                                help="480p lags less: every frame is sent to the server and back. "
                                     "Applies the next time the camera starts.")
             max_fps = st.slider("Max model runs / second", 1, 15, 5, key="preview_fps")
-            compare_n = st.slider("Frames compared per result", 1, MAX_CANDIDATES, 5, key="preview_compare",
-                                  help="The live assessment shows the best of the last N analysed frames "
-                                       "(highest danger, then most confident detections) instead of only "
-                                       "the newest frame. 1 = newest frame only.")
+            update_s = st.slider("Update result every (s)", 0.5, 5.0, 2.0, 0.5, key="preview_update",
+                                 help="All frames analysed in this period are compared and the best one "
+                                      "(highest danger, then most confident detections) stays on screen "
+                                      "until the next period ends. A higher danger level still shows at once.")
             show_overlay = st.checkbox("Draw detection overlay", value=True, disabled=is_demo, key="preview_overlay")
+            show_tech = st.toggle("Show technical details", value=False, key="preview_tech",
+                                  help="Scores, confidences and distances for testing and debugging. "
+                                       "Caregivers normally leave this off.")
             show_depth = st.toggle("Show depth map", value=False, disabled=is_demo, key="preview_show_depth",
                                    help="Coloured relative depth (brighter = closer), like pressing d in "
                                         "the live test script. Shown under the live camera and tested images.")
@@ -598,6 +752,94 @@ with navigation:
     tab_live, tab_test, tab_video, tab_history, tab_telegram = st.tabs(
         ["Live Monitoring", "Test Image", "Test Video", "Alert History", "Telegram"],
         key="main_tabs", on_change="rerun")   # lets "Configure Telegram" switch tabs
+
+
+# ---------------- guided tutorial ----------------
+def tour_steps():
+    """(title, body) for each tutorial step; uses the current Settings values."""
+    legend = "".join(
+        f'<b class="severity-{lvl.name.lower()}" style="background:{lvl.color}22;border:1px solid {lvl.color}">'
+        f'{LEVEL_TEXT[lvl][0]}</b><span>{LEVEL_TEXT[lvl][1]}</span>' for lvl in DangerLevel)
+    return [
+        ("Welcome to Child Safety Monitor",
+         "This app watches a camera and warns you when a child is near something dangerous:\n\n"
+         "- **Batteries** and **button batteries**\n- **Coins** and **small objects** a child could choke on\n"
+         "- **Sharp objects** such as knives and scissors\n- **Medicine**\n\n"
+         "This short guide shows you how to set it up. It takes about two minutes."),
+        ("Step 1 · Set up your home",
+         "Alerts are sent to your family on **Telegram**.\n\n"
+         "1. Open the **Telegram** tab at the top.\n"
+         "2. Type a name for your home and press **Create home**. A *Living room* is added for you, "
+         "and you can add more rooms, one for each camera.\n"
+         "3. **Bookmark this page.** The page link holds your private home key, so the bookmark brings you back.\n"
+         "4. Send the **invite link** to family members. They open it in Telegram and press **Start**."),
+        ("Step 2 · Start the camera",
+         "1. Go to the **Live Monitoring** tab.\n"
+         "2. Under **Video input**, choose your camera.\n"
+         "3. Press **Start monitoring**, and allow camera access if your browser asks.\n\n"
+         "**Tip:** place the camera so that both the child and the area around them are visible. "
+         "The app needs to see the child to tell how close a dangerous object is."),
+        ("Step 3 · Read the result",
+         "The **Assessment** panel tells you how safe things are right now:"
+         f'<div class="tour-legend">{legend}</div>'
+         "- **What the camera sees** lists the objects found and why they are dangerous.\n"
+         "- **How close is it?** says how near the object is to the child.\n\n"
+         f"The result changes at most every **{update_s:g} seconds** so you have time to read it. "
+         "If the danger goes **up**, it changes straight away."),
+        ("Step 4 · Turn on alerts",
+         "1. Below the Assessment panel, choose **This camera's room**.\n"
+         "2. Switch on **Send Telegram alerts**.\n\n"
+         f"You get a Telegram message with a photo when the level reaches **{LEVEL_TEXT[min_level][0]}** "
+         f"and stays there for **{confirm_s:g} seconds**. After an alert, the app waits "
+         f"**{cooldown} seconds** before sending another one for the same room. "
+         "You can change all of this in **Settings**."),
+        ("You're all set",
+         "A few more things you can do:\n\n"
+         "- **Test Image** and **Test Video**: check a photo or video clip without a live camera.\n"
+         "- **Alert History**: see every alert and whether it was delivered.\n"
+         "- **Settings** (top right): camera quality, how often the result updates, and when to alert. "
+         "Turn on *Show technical details* if you want to see the scores.\n\n"
+         "You can open this guide again at any time with the **Guide** button at the top."),
+    ]
+
+
+def close_tour():
+    ss.tour_open = False
+
+
+@st.dialog("Getting started", width="large", on_dismiss=close_tour)
+def tutorial():
+    steps = tour_steps()
+    step = min(ss.get("tour_step", 0), len(steps) - 1)
+    title, body = steps[step]
+    bars = "".join(f'<span class="{"done" if i <= step else ""}"></span>' for i in range(len(steps)))
+    st.html(f'<div class="tour-steps">{bars}</div>')
+    st.caption(f"Step {step + 1} of {len(steps)}")
+    st.subheader(title)
+    st.markdown(body, unsafe_allow_html=True)
+    last = step == len(steps) - 1
+
+    def go(delta):
+        ss.tour_step = step + delta
+
+    back, skip, nxt = st.columns(3)
+    back.button("Back", disabled=step == 0, use_container_width=True, key="tour_back",
+                on_click=go, args=(-1,))
+    if not last and skip.button("Skip guide", type="tertiary", use_container_width=True, key="tour_skip",
+                                on_click=close_tour):
+        st.rerun()                                     # full rerun closes the dialog
+    if last:
+        if nxt.button("Finish", type="primary", use_container_width=True, key="tour_next", on_click=close_tour):
+            st.rerun()
+    else:
+        nxt.button("Next", type="primary", use_container_width=True, key="tour_next", on_click=go, args=(1,))
+
+
+# New visitors (no home yet) see the guide once per session; anyone can reopen it.
+ss.setdefault("tour_open", not home)
+ss.setdefault("tour_step", 0)
+if ss.tour_open:
+    tutorial()
 
 
 def open_telegram_tab():
@@ -681,8 +923,8 @@ with tab_live:
                             '<strong>Your camera view will appear here</strong>'
                             '<p>Choose a video input and start monitoring.</p></div>')
                 # Smaller frames = less to encode/decode on both ends = less lag.
-                w, h = (640, 480) if quality.startswith("Smooth") else (1280, 720)
-                video_constraint = {"width": {"ideal": w}, "height": {"ideal": h},
+                w, h = (854, 480) if quality.startswith("Smooth") else (1280, 720)
+                video_constraint = {"width": {"ideal": w}, "height": {"ideal": h}, "aspectRatio": {"ideal": 16 / 9},
                                     "frameRate": {"ideal": 20, "max": 24}}
                 if control["device"]:
                     video_constraint["deviceId"] = {"exact": control["device"]}
@@ -697,7 +939,7 @@ with tab_live:
                     media_stream_constraints={"video": video_constraint, "audio": False},
                     desired_playing_state=bool(control["running"]), media_toggle_controls=False,
                     async_processing=True,
-                    video_html_attrs={"autoPlay": True, "controls": False, "muted": True, "style": {"width": "100%", "height": "calc(100vh - 16px)", "objectFit": "contain", "objectPosition": "center", "backgroundColor": "#e9eef4", "borderRadius": "8px"}},
+                    video_html_attrs={"autoPlay": True, "controls": False, "muted": True, "style": {"width": "100%", "height": "auto", "display": "block", "objectFit": "contain", "objectPosition": "center", "backgroundColor": "#e9eef4", "borderRadius": "8px"}},
                 )
 
     def live_snapshot():
@@ -721,12 +963,11 @@ with tab_live:
             c.metric("Result age", f"{age:.1f} s" if age is not None else "—")
             st.caption(f"Classifier: {type(classifier).__name__} · Inference limit: {max_fps}/s")
 
-    def best_recent(processor, playing, error):
-        """(best candidate, all candidates) among the last `compare_n` analysed frames."""
+    def shown_frame(processor, playing, error):
+        """(chosen candidate, frames it was picked from, frames scanned this round)."""
         if processor is None or not playing or error:
-            return None, []
-        candidates = processor.recent_candidates(compare_n)
-        return pick_best(candidates), candidates
+            return None, [], 0
+        return processor.shown()
 
     @st.fragment(run_every=0.5)
     def live_status():
@@ -734,17 +975,18 @@ with tab_live:
         stale = age is not None and age > 5.0
         if processor is not None:
             processor.max_infer_fps = max_fps
+            processor.selector.period = update_s
             # The video overlay stays per-frame so the boxes follow the camera.
             processor.draw_overlay = bool(show_overlay and not is_demo and playing and result is not None and not error and not stale)
-        best, _ = best_recent(processor, playing, error)
+        best, _, _ = shown_frame(processor, playing, error)
         frame = None
         if best is not None:
             result, frame = best.result, best.frame
         render_assessment(result, error=error, stale=stale, idle=not playing)
         render_alerts(result, processor, eligible=playing and not error and not stale, frame=frame)
 
-    def candidate_strip(candidates, best, thumb_w=200):
-        """One image: every compared frame side by side, the chosen one outlined."""
+    def candidate_strip(candidates, best, thumb_w=200, per_row=5):
+        """One image: the compared frames in rows of `per_row`, the chosen one outlined."""
         tiles = []
         for i, c in enumerate(candidates, 1):
             img = draw_result(c.frame, c.result, banner=False) if show_overlay and not is_demo else c.frame
@@ -752,36 +994,40 @@ with tab_live:
             img = cv2.resize(img, (thumb_w, h))
             chosen = c is best
             cv2.rectangle(img, (0, h - 26), (thumb_w, h), (16, 34, 64), -1)
-            label = f"#{i}  score {c.result.score:.2f}" + ("  PICKED" if chosen else "")
+            label = (f"#{i}  score {c.result.score:.2f}" if show_tech
+                     else f"#{i}  {LEVEL_TEXT[c.result.level][0]}") + ("  PICKED" if chosen else "")
             cv2.putText(img, label, (6, h - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45,
                         (255, 255, 255), 1, cv2.LINE_AA)
             border = (142, 136, 16) if chosen else (230, 225, 220)   # teal (BGR) vs light grey
             tiles.append(cv2.copyMakeBorder(img, 5, 5, 5, 5, cv2.BORDER_CONSTANT, value=border))
         height = max(t.shape[0] for t in tiles)
-        tiles = [cv2.copyMakeBorder(t, 0, height - t.shape[0], 0, 4, cv2.BORDER_CONSTANT,
-                                    value=(252, 249, 247)) for t in tiles]
-        return np.hstack(tiles)
+        bg = (252, 249, 247)
+        tiles = [cv2.copyMakeBorder(t, 0, height - t.shape[0] + 4, 0, 4, cv2.BORDER_CONSTANT, value=bg)
+                 for t in tiles]
+        blank = np.full_like(tiles[0], bg)
+        tiles += [blank] * (-len(tiles) % per_row)          # pad the last row
+        return np.vstack([np.hstack(tiles[i:i + per_row]) for i in range(0, len(tiles), per_row)])
 
     @st.fragment(run_every=1.0)
     def selected_frame_card():
         processor, playing, _, error, _ = live_snapshot()
-        best, candidates = best_recent(processor, playing, error)
+        best, candidates, scanning = shown_frame(processor, playing, error)
         with st.container(border=True, key="preview_selected_frame"):
             st.html('<div class="camera-card-header"><strong>Selected frame</strong><span class="camera-view-tag">'
-                    f'Best of last {compare_n} analysed frame{"s" if compare_n > 1 else ""}</span></div>')
+                    f'Best frame, updates every {update_s:g}s</span></div>')
             if best is None:
                 state_box("No frames analysed yet",
                           "Start monitoring. The frame used for the assessment will appear here.", compact=True)
                 return
-            shown = draw_result(best.frame, best.result, banner=not is_demo) if show_overlay and not is_demo else best.frame
+            shown = draw_result(best.frame, best.result, banner=show_tech) if show_overlay and not is_demo else best.frame
             pos = candidates.index(best) + 1
             st.image(shown, channels="BGR", width="stretch",
-                     caption=f"Frame #{pos} of {len(candidates)} · {time.monotonic() - best.t:.1f}s ago · "
-                             f"{best.result.level.name} ({best.result.score:.2f})")
+                     caption=(f"Frame #{pos} of {len(candidates)} compared · {best.result.level.name} "
+                              f"({best.result.score:.2f}) · scanning next round: {scanning} frame(s)") if show_tech
+                     else f"The most worrying picture from the last {update_s:g} seconds ({len(candidates)} checked).")
             if len(candidates) > 1:
                 st.image(candidate_strip(candidates, best), channels="BGR", width="stretch",
-                         caption="Compared frames, oldest to newest. Picked: highest danger score, "
-                                 "then most confident detections.")
+                         caption="Pictures checked, oldest to newest. The one with the highest risk is shown above.")
 
     @st.fragment(run_every=1.0)
     def depth_preview():
