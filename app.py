@@ -147,7 +147,7 @@ h3 { font-size: 1.1rem !important; }
 .risk-caution { background: #fff7d6; border-color: #ead27b; } .risk-caution .risk-head { color: #806000; }
 .risk-safe { background: #e9f8ef; border-color: #9fd8b5; } .risk-safe .risk-head { color: #126c40; }
 .footer { margin-top: 25px; text-align: right; font-size: 12px; color: #6b7c93; }
-/* Desktop composition follows the reference; the camera scales with viewport height. */
+/* The stopped preview stays compact; live video follows its natural aspect ratio. */
 :root { --camera-height: clamp(220px, calc(100dvh - 435px), 650px); }
 [data-testid="stMainBlockContainer"] { max-width: none !important; padding: 12px 2.4vw 8px !important; }
 [data-testid="stVerticalBlock"] { gap: 10px; }
@@ -179,8 +179,8 @@ h1 { font-family: Arial, sans-serif; font-size: 32px !important; margin: 0 !impo
 .camera-card-header strong { font-size: 17px; }
 .camera-view-tag { font-size: 12px; background: #e8edf3; color: #4b5f7b; padding: 6px 12px; border-radius: 7px; }
 .st-key-preview_camera_card { background: white; }
-.st-key-preview_video_frame { position: relative; height: var(--camera-height); min-height: var(--camera-height); overflow: hidden; border-radius: 8px; }
-.st-key-preview_video_frame iframe { height: var(--camera-height) !important; }
+.st-key-preview_video_frame { position: relative; overflow: hidden; border-radius: 8px; }
+.st-key-preview_video_frame iframe { display: block; width: 100%; }
 .st-key-preview_video_frame:has(.camera-placeholder) iframe { position: absolute; opacity: 0; pointer-events: none; }
 .camera-placeholder { height: var(--camera-height); min-height: 0; margin: 0; border: 0; }
 .panel-title { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; }
@@ -923,8 +923,8 @@ with tab_live:
                             '<strong>Your camera view will appear here</strong>'
                             '<p>Choose a video input and start monitoring.</p></div>')
                 # Smaller frames = less to encode/decode on both ends = less lag.
-                w, h = (640, 480) if quality.startswith("Smooth") else (1280, 720)
-                video_constraint = {"width": {"ideal": w}, "height": {"ideal": h},
+                w, h = (854, 480) if quality.startswith("Smooth") else (1280, 720)
+                video_constraint = {"width": {"ideal": w}, "height": {"ideal": h}, "aspectRatio": {"ideal": 16 / 9},
                                     "frameRate": {"ideal": 20, "max": 24}}
                 if control["device"]:
                     video_constraint["deviceId"] = {"exact": control["device"]}
@@ -939,7 +939,7 @@ with tab_live:
                     media_stream_constraints={"video": video_constraint, "audio": False},
                     desired_playing_state=bool(control["running"]), media_toggle_controls=False,
                     async_processing=True,
-                    video_html_attrs={"autoPlay": True, "controls": False, "muted": True, "style": {"width": "100%", "height": "calc(100vh - 16px)", "objectFit": "contain", "objectPosition": "center", "backgroundColor": "#e9eef4", "borderRadius": "8px"}},
+                    video_html_attrs={"autoPlay": True, "controls": False, "muted": True, "style": {"width": "100%", "height": "auto", "display": "block", "objectFit": "contain", "objectPosition": "center", "backgroundColor": "#e9eef4", "borderRadius": "8px"}},
                 )
 
     def live_snapshot():
