@@ -9,19 +9,17 @@ Streamlit UI for live camera monitoring, image/video testing, and Telegram alert
 Full pipeline (`HazardSpatialClassifier`), used when `weights/final_best.pt` exists:
 
 ```text
-camera frame -> Tze's trained YOLOv8 (7 hazard groups)  -> hazards  -+
+camera frame -> Model trained YOLOv8 (7 hazard groups)  -> hazards  -+
              -> stock YOLOv8n (COCO "person")             -> person   -+-> SpatialAnalyzer
              -> Depth Anything V2 (background thread)     -> depth    -+   -> danger level
 ```
 
-Put the final evaluation's selected model, `final_best.pt`, in `weights/` and restart. See [artifact locations and verification](MODEL_RESULTS.md#artifact-locations-and-verification). `weights/` is not in Git, so each
-person copies it once; `HAZARD_MODEL_PATH` can point elsewhere. Without it, the
+Put the final evaluation's selected model, `final_best.pt`, in `weights/` and restart. See [artifact locations and verification](MODEL_RESULTS.md#artifact-locations-and-verification). `HAZARD_MODEL_PATH` can point elsewhere. Without it, the
 app uses the spatial team's stock-YOLO demo (`SpatialDemoClassifier`: person,
 knife and scissors only). The Live page shows which one is running, and a
 model that fails to load is shown as an error with demo mode.
 
-`weights/yolov8n.pt` is the person model used in the trained-hazard path; the stock-only demo uses `weights/yolov8s.pt`. Missing stock weights download on first use, as does the depth model (requires `transformers` and internet for initial setup). A person stands
-in for the child reference; this model does not identify age.
+`weights/yolov8n.pt` is the person model used in the trained-hazard path; the stock-only demo uses `weights/yolov8s.pt`. Missing stock weights download on first use, as does the depth model (requires `transformers` and internet for initial setup). A person stands in for the child reference; this model does not identify age.
 
 The UI owns one browser camera stream; it imports the demo's helper functions
 without running its camera-opening `main()`. Live depth runs in the background
@@ -75,35 +73,60 @@ The combined training report records separate Kaggle runs. Its saved outputs can
 ## Integration
 
 ```text
-BGR image -> detector.detect() -> spatial.assess() -> ClassificationResult -> UI/alerts
+BGR image → detector.detect() → spatial.assess() → ClassificationResult → UI/alerts
 ```
 
-**Tze:** implement `YOLODetector` in `modules/detector.py`. Load weights once in
-`__init__()`. `detect(frame_bgr)` accepts an OpenCV BGR image and returns a
-`list[Detection]`, with labels, confidence in `[0, 1]`, and bounding boxes
-`(x1, y1, x2, y2)` in the original image's pixels. Keep augmentation in training.
+### Hazard Detection
 
-**Ayumi & Nic:** implement `SpatialAnalyzer.assess(detections, frame_shape)` in
-`modules/spatial.py`. `frame_shape` is `(height, width)`. Return
-`(danger_score, reason)`, where the score is in `[0, 1]` and the reason explains
-the risk. Define proximity calculations and behaviour when children, hazards,
-or bounding boxes are missing. Image distance alone is not physical distance.
+`YOLODetector` in `modules/detector.py` handles inference with the trained hazard model. Load the weights once in `__init__()`.
 
-Agree on class labels and how children are identified before integration.
-A person detection alone does not identify a child. Detection confidence and
-danger score are separate values.
+`detect(frame_bgr)` accepts an OpenCV BGR image and returns a `list[Detection]`. Each detection contains:
 
-**Shared:** `SafetyClassifier` already connects these interfaces and converts
-the score to `SAFE`, `LOW`, `MEDIUM`, or `HIGH`. The UI continues to call
-`predict(frame_bgr) -> ClassificationResult`, containing `level`, `score`,
-`detections`, and `reason`.
+- A class label.
+- A confidence score in `[0, 1]`.
+- A bounding box `(x1, y1, x2, y2)` in the original image’s pixel coordinates.
 
-`get_classifier()` in `modules/classifier.py` picks the pipeline:
-`HazardSpatialClassifier` (trained hazards + person + depth + spatial) when the
-trained weights are found, otherwise `SpatialDemoClassifier`. `DummyClassifier`
-remains the labelled fallback if model loading fails. The existing adapter renames legacy `medicine_syrup` to `liquid_medicine`. The final model instead outputs grouped labels including `medicine`, `sharp` and `small_object`; those require explicit spatial-weight handling. The combined `pen` group also includes pen caps, so the older pen-only risk weight needs review. Use the **Test Image** / **Test Video** tabs to check boxes,
-scores, and explanations. Tests:
-`python -m pytest modules/tests/test_depth_logic.py modules/tests/test_hazard_pipeline.py -q`.
+Keep data augmentation in training, rather than applying random augmentation during inference.
+
+### Spatial Assessment
+
+`SpatialAnalyzer.assess(detections, frame_shape)` in `modules/spatial.py` receives detections and the frame dimensions `(height, width)`. Its interface returns `(danger_score, reason)`, where the score is in `[0, 1]` and the reason explains the assessed risk.
+
+Proximity calculations must define how missing reference people, missing hazards and invalid bounding boxes are handled. Image-based proximity does not directly measure physical distance. A person detection provides a reference person; it does not establish that the person is a child.
+
+Detection confidence and danger score are separate values.
+
+### Pipeline and Label Mapping
+
+`SafetyClassifier` connects the detector and spatial interfaces and converts the score into `SAFE`, `LOW`, `MEDIUM` or `HIGH`. The UI calls:
+
+```python
+predict(frame_bgr) -> ClassificationResult
+```
+
+The result contains `level`, `score`, `detections` and `reason`.
+
+`get_classifier()` in `modules/classifier.py` selects the pipeline:
+
+- `HazardSpatialClassifier`: trained hazards, person detection, depth and spatial assessment when trained weights are available.
+- `SpatialDemoClassifier`: stock-model demonstration when trained weights are unavailable.
+- `DummyClassifier`: labelled fallback when model loading fails.
+
+The final hazard model outputs seven groups: `battery`, `coin_battery`, `coin`, `small_object`, `pen`, `sharp` and `medicine`.
+
+The existing spatial mapping still uses older class names. The grouped labels require explicit risk-weight handling before relying on the reported risk levels. The `pen` group also includes pen caps, so its weight needs review. The legacy adapter from `medicine_syrup` to `liquid_medicine` does not resolve the new grouped labels.
+
+### Integration Checks
+
+Use **Test Image** and **Test Video** to inspect bounding boxes, labels, confidence scores and risk explanations.
+
+Run the pipeline tests with:
+
+```powershell
+py -m pytest modules/tests/test_depth_logic.py modules/tests/test_hazard_pipeline.py -q
+```
+
+Passing functional tests does not establish reliable real-camera hazard detection or child identification.
 
 ## Telegram alerts
 
