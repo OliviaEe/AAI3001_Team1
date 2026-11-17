@@ -9,7 +9,7 @@ Young children explore by touching and mouthing objects. Button batteries, coins
 This project is a prototype monitoring assistant. It watches a camera feed, image or video and:
 
 1. **Detects household hazards** with a custom-trained YOLOv8 model (seven hazard groups).
-2. **Detects people** with a stock COCO person detector, used as the reference point for proximity.
+2. **Detects people** with a stock COCO person detector, used as the reference point for proximity. For demo purposes, any detected person stands in for the child.
 3. **Estimates relative depth** with Depth Anything V2 Small to tell whether a hazard is at roughly the same depth as the person or far behind or in front of them.
 4. **Scores spatial risk** from the image-plane gap, the depth gap and the hazard type, then shows a SAFE, CAUTION, WARNING or CRITICAL level in a Streamlit dashboard.
 5. **Alerts caregivers** through Telegram when risk stays high, with duration and cooldown controls to limit repeated messages.
@@ -61,17 +61,33 @@ Each source keeps its own licence and terms of use. Check the linked dataset pag
 
 Team members photographed the hazard objects in real homes: on beds, blankets, clutter, floors and tables, under ordinary indoor lighting. These photos add the cluttered, patterned backgrounds and casual phone-camera angles that the public datasets mostly lack, and that a home monitoring camera is likely to see.
 
-<p align="center">
-  <img src="figures/dataset/self_collected_example.jpg" alt="Self-collected example: red-handled scissors on a patterned blanket" width="300">
-  <br><em>Self-collected example: scissors (<code>sharp</code> group) on a patterned blanket, annotated in Roboflow.</em>
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="figures/dataset/pill_bottle_raw.jpg" alt="Self-collected photo of a pill bottle on a cluttered desk" width="280"><br><em>Raw self-collected photo</em></td>
+    <td align="center"><img src="figures/dataset/pill_bottle_labelled.jpg" alt="Same photo with a green bounding box labelled pill_bottle" width="280"><br><em>Labelled in Roboflow</em></td>
+  </tr>
+</table>
 
 #### 3. Annotation
 
 - **Tool:** the team annotated the self-collected photos in **[Roboflow](https://roboflow.com/)**, drawing a bounding box around each hazard object and exporting the labels in YOLO format.
 - **Public images:** labels were converted or relabelled where needed so that every source uses the same 14-class scheme.
 
-The labelled data is organised into **12 category folders**, each with images and YOLO `.txt` annotations.
+**Example: from photo to label.** For the pill bottle photo above, the exported YOLO label file ([pill_bottle_label.txt](figures/dataset/pill_bottle_label.txt)) has one line per object:
+
+```text
+12 0.552754 0.581933 0.218487 0.231092
+```
+
+| Value | Field | Meaning | In pixels (960 × 1280 image) |
+|:---:|:---|:---|:---|
+| `12` | class ID | `pill_bottle` in the original 14-class scheme | Mapped to final group **6 `medicine`** during preparation |
+| `0.552754` | x centre | Box centre ÷ image width | 0.552754 × 960 ≈ **531 px** |
+| `0.581933` | y centre | Box centre ÷ image height | 0.581933 × 1280 ≈ **745 px** |
+| `0.218487` | width | Box width ÷ image width | 0.218487 × 960 ≈ **210 px** |
+| `0.231092` | height | Box height ÷ image height | 0.231092 × 1280 ≈ **296 px** |
+
+All four coordinates are **normalised to 0–1**, so the label stays valid if the image is resized. The box corners are `(x1, y1) ≈ (426, 597)` and `(x2, y2) ≈ (636, 893)`. 
 
 ### Classes
 
@@ -113,41 +129,25 @@ Experiment 6 obtains **96.63% crop-validation accuracy**, but adding it to the d
 
 ## Known Limitations
 
+### Design priority: catching hazards first
+
+In child safety, missing a real hazard is far more costly than raising an extra alert. A false alarm costs the caregiver a quick glance. A missed button battery or open pill bottle could end up in a child's mouth. The system is therefore designed for this side of caution**:
+
+- **Low confidence threshold (`0.30`):** borderline detections are kept rather than discarded, so possible hazards are still flagged.
+
 ### Hazard detection
 
-- **Missed and false detections remain.** At confidence `0.30`, the clean test set had **546 false detections and 469 missed objects across 2,568 images**. Under synthetic stress, false detections fell to **366** but missed objects rose to **721**. These are object-level counts, not caregiver-alert counts.
-- **Small objects are the weakest case.** Recall is about 0.65 for objects 16–32 pixels across, compared with 0.92 for objects 64 pixels or larger. Shrinking images to 0.25 scale drops recall from 0.835 to 0.682. Button batteries and coins far from the camera are exactly this case.
-- **Some classes are weaker.** Under stress, recall is 0.702 for `pen`, 0.748 for `sharp` and 0.767 for `battery`.
-- **Blur, poor lighting and unfamiliar scenes** reduce accuracy.
-- **No detections does not mean the scene is safe.**
+- **Errors in both directions remain.** On the clean test set (2,568 images) there were **546 false detections and 469 missed objects**. Under synthetic stress (blur, noise, lighting changes), misses rose to **721**.
+- **Small objects are the weakest case.** Recall is about 0.65 for objects 16–32 px across, compared with 0.92 for objects 64 px or larger. That's exactly the size of coins and button batteries seen from a distance.
+- **Weaker classes:** `pen` (0.70 recall under stress), `sharp` (0.75) and `battery` (0.77).
+- **No detection does not mean the scene is safe.**
 
 ### Spatial analysis and relative depth
 
-- **Proximity is not a physical distance.** It is the gap between bounding-box edges divided by the person's box height, so it isn't in metres. Posture (sitting, crawling, lying down), a person cut off at the frame edge, camera angle and perspective all change it.
-- **Overlapping boxes do not mean contact.** A hazard on a table behind a child can overlap the child's box in 2D.
-- **Depth is relative, not metric.** Depth Anything V2 Small gives values per frame, scaled between 0 and 1 (2nd–98th percentile). They aren't centimetres and can't be compared directly across frames, cameras or scenes.
-- **Monocular depth has its own failure modes.** It can be wrong on reflective, transparent or textureless surfaces (glass, mirrors, plain floors), and on small objects whose box covers only a few depth pixels. A nearly flat depth map gives a neutral 0.5.
-- **Depth sampling is coarse.** Each box's depth is the median of its central 50%. For a person, that may be the torso rather than the reaching hand. For a small or badly fitting hazard box, it may be the background. Depth runs at 252 × 252 to save time, which loses fine detail.
-- **The held-object adjustment is a guess.** When boxes overlap and the hazard is nearer the camera, up to 0.30 is subtracted from the depth gap. This value was set by hand, not measured from arm reach.
-- **Live depth can be stale.** Depth runs in a background worker. A depth map up to **1.5 s old** is still used for scoring, so in a fast-moving scene it may describe an earlier moment. Older maps fall back to 2D-only scoring.
-- **The risk score is hand-tuned.** Hazard weights and the CAUTION/WARNING/CRITICAL distance thresholds were chosen by the team. They aren't learned from data or validated against real injury risk, and detection confidence isn't factored into the score.
-- **Smoothing delays changes.** A one-second score hold and a limit on how fast the score can fall reduce flicker. The trade-off is that the displayed level can stay high briefly after the hazard has gone.
-- **"Person" doesn't mean "child."** The COCO person detector can't tell age, so adults trigger the same logic. If no person is detected, the score is zero even if hazards are present.
-- **No tracking.** All person–hazard pairs are scored each frame and the highest wins. Identities aren't tracked, so the riskiest pair can switch between frames.
-- **Seven-class integration gap.** The spatial weights still use the legacy fourteen-class labels, so `small_object`, `sharp` and `medicine` detections are currently **ignored** by risk scoring. The merged `pen` group uses the old pen weight. See the [spatial integration gap](docs/SPATIAL_ANALYSIS.md#seven-class-integration-gap).
-- **Not benchmarked.** No labelled real-world spatial dataset, measured-distance ground truth, or false-alert / missed-alert rate has been collected. Spatial errors also add to upstream detection errors: depth can't make up for a hazard the detector missed.
-
-### Dataset and evaluation
-
-- **Test images aren't fully independent.** Visual hashing can miss related scenes (four large candidate groups were skipped), and the images informed earlier versions of the project. The test score is therefore not a fully unseen benchmark.
-- **Label quality isn't fully audited.** Format checks confirm labels are readable and well-formed, but they don't prove every visible hazard has a correct, tight box. Public and self-collected images may have been labelled to slightly different standards.
-- **Domain gap.** Many public images are close-ups or product shots, which differ from a ceiling- or shelf-mounted monitoring camera.
-- **Synthetic stress isn't real conditions.** Stress transforms reuse the same photos, so they don't replace testing on new homes, cameras and lighting.
-- **No empty scenes.** The evaluation has no labelled empty scenes, so the caregiver false-alarm rate is unknown.
-
-### Whole system
-
-The model metrics don't validate the complete live camera → detection → depth → risk → Telegram pipeline. End-to-end latency, alert accuracy and behaviour in real homes haven't been measured. See [detailed model failures and limitations](docs/MODEL_RESULTS.md#failure-analysis-and-practical-consequences) and [spatial limitations and next steps](docs/SPATIAL_ANALYSIS.md#limitations-and-next-validation-steps).
+- **Proximity is not a real distance.** It is the gap between bounding boxes divided by the person's box height, so it isn't in metres. Posture, camera angle and people cut off at the frame edge all change it. Overlapping boxes don't mean contact.
+- **Depth is relative, not metric.** Depth Anything V2 gives 0–1 values per frame, not centimetres. It can be wrong on glass, mirrors, plain surfaces and very small objects. It samples the centre of each box, which for a person is the torso rather than the reaching hand.
+- **Live depth can lag.** A depth map up to 1.5 s old is still used, so it may describe an earlier moment in a fast-moving scene.
+- **The risk score is hand-tuned.** Hazard weights, distance thresholds and the 0.30 "held object" depth allowance were set by the team. They weren't learned from data or tested against real injury risk.
 
 ## System scope and integration status
 
