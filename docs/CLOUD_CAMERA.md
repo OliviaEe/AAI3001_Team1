@@ -13,20 +13,37 @@ ingress and egress. Check the allowance shown in your account and keep tests sho
 1. Create an account at <https://dashboard.metered.ca/signup> and choose the free TURN plan.
 2. Create an app and open **TURN Server > Credentials**. Generate a TURN credential
    using the [credential guide](https://www.metered.ca/docs/turn-server-service/creating-turn-credentials/).
-3. Find your app's Metered domain and the generated credential's **API key**.
-   Use the credential-scoped API key, rather than the application's Developer Secret Key.
+3. Open the generated credential and copy its **username** and **password** privately.
 4. Add these top-level entries in **Streamlit App settings > Secrets**, alongside
    the existing Telegram secret. Replace the placeholders privately:
 
    ```toml
-   METERED_TURN_DOMAIN = "your-app.metered.live"
-   METERED_TURN_API_KEY = "your-credential-api-key"
+   METERED_TURN_USERNAME = "your-turn-username"
+   METERED_TURN_PASSWORD = "your-turn-password"
    ```
 
 5. Allow up to two minutes for a newly created credential to propagate, then save
    the settings and reboot the app. Open a fresh app tab after startup.
-6. Under **Performance details**, confirm **Metered TURN available**, then retry
+6. Under **Performance details**, confirm **Metered TURN configured**, then retry
    the camera on the affected device. Stop monitoring after the test and check usage.
+
+The direct setup uses the `global.relay.metered.ca` hostname shown in the
+dashboard snippet, including TLS on port 443. If your snippet shows another
+Metered relay host, set `METERED_TURN_HOST` to that hostname without a scheme or
+port. The configured username and password are passed to WebRTC for TURN
+authentication. The label means configuration is present; it does not verify
+the password or a successful relay allocation. Replace credentials when expired
+or revoked.
+
+### Optional credential API setup
+
+If your dashboard also exposes a credential-scoped API key, you can use it
+instead of the username/password entries:
+
+```toml
+METERED_TURN_DOMAIN = "your-app.metered.live"
+METERED_TURN_API_KEY = "your-credential-api-key"
+```
 
 The server retrieves ICE credentials using Metered's
 [credential endpoint](https://www.metered.ca/docs/turn-rest-api/get-credential/)
@@ -60,7 +77,8 @@ an account or enable billing.
 
 ## Provider selection and connection status
 
-Metered settings take precedence when either Metered entry is present. Incomplete
+Metered username/password entries take precedence over its API setup, which
+takes precedence over Cloudflare. Incomplete
 Metered settings or a failed Metered request show a warning and use STUN; they
 never silently activate Cloudflare. Without Metered entries, Cloudflare is used
 only when both Cloudflare entries are configured. Without either provider, the

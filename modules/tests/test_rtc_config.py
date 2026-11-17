@@ -128,3 +128,41 @@ def test_metered_request_uses_credential_endpoint(domain):
 def test_metered_domain_cannot_send_api_key_to_another_service(domain):
     with pytest.raises(ValueError):
         fetch_metered_ice_servers(domain, "test-key", http_get=unused_provider)
+
+
+def test_metered_dashboard_credentials_do_not_need_an_api_request():
+    settings = KEYS | METERED_KEYS | {
+        "METERED_TURN_USERNAME": "dashboard-user", "METERED_TURN_PASSWORD": "dashboard-password",
+    }
+    config, method, warning = camera_rtc_configuration(
+        APP_URL, settings.get, unused_provider, unused_provider,
+    )
+    assert method == "Metered TURN configured" and warning is None
+    relay = config["iceServers"][1]
+    assert relay["username"] == "dashboard-user" and relay["credential"] == "dashboard-password"
+    assert relay["urls"][0] == "turns:global.relay.metered.ca:443?transport=tcp"
+
+
+def test_dashboard_credentials_can_use_the_relay_host_in_their_snippet():
+    settings = {"METERED_TURN_USERNAME": "user", "METERED_TURN_PASSWORD": "password",
+                "METERED_TURN_HOST": "standard.relay.metered.ca"}
+    config, method, warning = camera_rtc_configuration(APP_URL, settings.get, unused_provider)
+    assert config["iceServers"][1]["urls"][0].startswith("turns:standard.relay.metered.ca:")
+    assert warning is None
+
+
+@pytest.mark.parametrize("entry", ["METERED_TURN_USERNAME", "METERED_TURN_PASSWORD"])
+def test_incomplete_dashboard_credentials_do_not_activate_another_provider(entry):
+    config, method, warning = camera_rtc_configuration(
+        APP_URL, (KEYS | {entry: "private-value"}).get, unused_provider, unused_provider,
+    )
+    assert "STUN only" in method and "incomplete" in warning
+    assert "private-value" not in repr((config, warning))
+
+
+def test_dashboard_password_cannot_be_sent_to_an_unrelated_relay_host():
+    settings = {"METERED_TURN_USERNAME": "user", "METERED_TURN_PASSWORD": "private-value",
+                "METERED_TURN_HOST": "example.com"}
+    config, method, warning = camera_rtc_configuration(APP_URL, settings.get, unused_provider)
+    assert "STUN only" in method and "METERED_TURN_HOST" in warning
+    assert "private-value" not in repr(config)

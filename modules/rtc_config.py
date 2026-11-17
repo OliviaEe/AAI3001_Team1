@@ -32,6 +32,28 @@ def camera_rtc_configuration(app_url, read_setting, fetch_turn_servers, fetch_me
         return {"iceServers": []}, "Local connection", None
 
     direct = {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+    username = read_setting("METERED_TURN_USERNAME")
+    password = read_setting("METERED_TURN_PASSWORD")
+    if username or password:
+        if not username or not password:
+            return direct, "Direct connection (STUN only)", (
+                "Metered camera relay setup is incomplete. Add both METERED_TURN_USERNAME "
+                "and METERED_TURN_PASSWORD in Streamlit Secrets."
+            )
+        host = (read_setting("METERED_TURN_HOST") or "global.relay.metered.ca").strip().lower()
+        if not re.fullmatch(r"[a-z0-9-]+\.relay\.metered\.ca", host):
+            return direct, "Direct connection (STUN only)", (
+                "Check METERED_TURN_HOST: use the relay hostname from the Metered snippet, "
+                "such as global.relay.metered.ca, without a scheme or port."
+            )
+        servers = [
+            {"urls": ["stun:stun.relay.metered.ca:80"]},
+            {"urls": [f"turns:{host}:443?transport=tcp", f"turn:{host}:80?transport=tcp",
+                      f"turn:{host}:80", f"turn:{host}:443"],
+             "username": username, "credential": password},
+        ]
+        return {"iceServers": servers}, "Metered TURN configured", None
+
     domain = read_setting("METERED_TURN_DOMAIN")
     metered_key = read_setting("METERED_TURN_API_KEY")
     if domain or metered_key:
