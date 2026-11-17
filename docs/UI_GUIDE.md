@@ -133,7 +133,7 @@ Passing functional tests does not establish reliable real-camera hazard detectio
 Create `.streamlit/secrets.toml` (already ignored by Git):
 
 ```toml
-TELEGRAM_BOT_TOKEN = "your-bot-token"
+TELEGRAM_BOT_TOKEN = "8880184392:AAHqXQC92HcfEzmjo7MEfVzB2OJdH3ohBCc"
 ```
 
 How recipients are organised:
