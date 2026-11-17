@@ -171,6 +171,23 @@ python -m venv .venv
 
 Obtain the selected checkpoint separately and place it at `weights/final_best.pt`, or configure `HAZARD_MODEL_PATH`. Weights are ignored by Git. Without the trained checkpoint, the app uses its stock-model demo/fallback as described in the [UI guide](docs/UI_GUIDE.md).
 
+## Cloud Deployment
+
+The Child Safety Monitor is deployed on **Streamlit Community Cloud** through Olivia's GitHub fork.
+
+**Live application:** [Child Safety Monitor](https://aai3001team1-cvdl-child-safety-monitor.streamlit.app)
+
+The deployment runs `app.py` using Python 3.13. Python dependencies are installed from `requirements.txt`, while `packages.txt` supplies the Linux libraries required by OpenCV:
+
+```text
+libgl1
+libglib2.0-0t64
+```
+
+The Telegram bot token is configured through Streamlit's Secrets settings.
+
+Cloud testing confirmed that uploaded-image inference, live camera monitoring, and Telegram alert delivery work. Processing speed depends on the available cloud resources and network connection. Local database storage is not guaranteed to persist across cloud rebuilds or restarts.
+
 ## Experiment records in this repository
 
 - `results/validation/`: recorded validation scores and threshold sweeps.
