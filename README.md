@@ -7,7 +7,7 @@ A team computer-vision prototype combining hazard detection, a person reference,
 **Team:** AAI3001 — Lab P1, Group 1
 
 | Team Member | Admin Number | Contribution |
-|:---:|:---:|:---:|
+|:---:|:---:|:---|
 | Ee Chew Fong Olivia | 2102743 | Streamlit interface, camera and image/video testing, Telegram alerts and application integration |
 | Thet Htar San | 2502046 | Streamlit interface, camera and image/video testing, Telegram alerts and application integration |
 | Teng Tze Hui | 2502437 | Dataset preparation, annotation validation, augmentation, model training, experiment evaluation and model-results documentation |
@@ -19,7 +19,7 @@ A team computer-vision prototype combining hazard detection, a person reference,
 ## Documentation
 
 | Guide | What it covers |
-|:---:|:---:|
+|:---:|:---|
 | [UI and application guide](docs/UI_GUIDE.md) | Installation, camera controls, image/video testing, spatial/depth integration, Telegram and deployment |
 | [Model experiments, results and limitations](docs/MODEL_RESULTS.md) | Baseline and six experiments, evaluation protocol, selected configuration, findings, limitations, future work and artifact records |
 | [Spatial analysis and integration](docs/SPATIAL_ANALYSIS.md) | Relative box distance, depth sampling, risk formula, temporal handling, tests and seven-class integration gap |
