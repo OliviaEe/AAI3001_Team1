@@ -36,6 +36,10 @@ from modules.subscriptions import SubscriptionStore, start_poller
 from modules.spatial import CHILD_LABELS, DANGER_WEIGHTS, MAX_NORM_DIST, ScoreHold, pair_distances
 from modules.spatial_pipeline import MAX_DEPTH_AGE, colorize_depth
 
+# Zone -> (icon, plain words) for the caregiver-facing proximity cards.
+ZONE_DISPLAY = {"CRITICAL": ("🔴", "within reach of"), "WARNING": ("🟠", "close to"),
+                "CAUTION": ("🟡", "near"), "SAFE": ("🟢", "far from")}
+
 
 st.set_page_config(page_title="Child Safety Monitor", page_icon="🛡️", layout="wide")
 st.html("""
@@ -130,6 +134,18 @@ h3 { font-size: 1.1rem !important; }
   font-size: 11px; color: #6b7c93; }
 .object-row { padding: 10px 0; border-bottom: 1px solid #e4eaf1; display: flex; justify-content: space-between; }
 .object-row span { color: #64748b; }
+.risk-card { border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; border: 1px solid; }
+.risk-card .risk-head { font-weight: 700; font-size: 15px; }
+.risk-card .risk-stats { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 4px; font-size: 13px; color: #475569; }
+.risk-card .risk-stats b { font-size: 16px; color: #102240; }
+.risk-card .risk-more { margin-top: 4px; font-size: 12px; color: #64748b; }
+.risk-card.risk-top { padding: 14px 16px; border-width: 2px; }
+.risk-card.risk-top .risk-head { font-size: 18px; }
+.risk-card.risk-top .risk-stats b { font-size: 20px; }
+.risk-critical { background: #ffebeb; border-color: #efaaaa; } .risk-critical .risk-head { color: #a51f1f; }
+.risk-warning { background: #fff0e0; border-color: #f4b16a; } .risk-warning .risk-head { color: #9a4600; }
+.risk-caution { background: #fff7d6; border-color: #ead27b; } .risk-caution .risk-head { color: #806000; }
+.risk-safe { background: #e9f8ef; border-color: #9fd8b5; } .risk-safe .risk-head { color: #126c40; }
 .footer { margin-top: 25px; text-align: right; font-size: 12px; color: #6b7c93; }
 /* Desktop composition follows the reference; the camera scales with viewport height. */
 :root { --camera-height: clamp(220px, calc(100dvh - 435px), 650px); }
@@ -413,7 +429,7 @@ LEVEL_TEXT = {
     DangerLevel.MEDIUM: ("Be careful", "A hazard is getting close to the child. Keep an eye on them."),
     DangerLevel.HIGH: ("Danger", "A hazard is within the child's reach. Check on them now."),
 }
-DISTANCE_TEXT = {"CRITICAL": "within reach of", "WARNING": "close to", "CAUTION": "near", "SAFE": "far from"}
+DISTANCE_TEXT = {zone: words for zone, (_, words) in ZONE_DISPLAY.items()}
 DISPLAY_NAMES = {"coin_battery": "button battery", "small_object": "small object", "sharp": "sharp object",
                  "liquid_medicine": "medicine syrup", "pill_bottle": "pill bottle", "pill_packet": "pill packet",
                  "small_toy": "small toy", "pencap": "pen cap", "bottlecap": "bottle cap"}
@@ -436,13 +452,52 @@ def nice_name(label):
     return DISPLAY_NAMES.get(key, key.replace("_", " "))
 
 
+def pair_risk(p):
+    """Danger of one child-hazard pair: hazard weight x closeness (same maths as spatial.py)."""
+    weight = DANGER_WEIGHTS.get(label_key(p["hazard"]), 0.5)
+    return weight * max(0.0, 1.0 - p["distance"] / MAX_NORM_DIST)
+
+
 def worst_pair(detections):
-    """The child-hazard pair that drives the danger level (same maths as spatial.py)."""
-    def risk(p):
-        weight = DANGER_WEIGHTS.get(label_key(p["hazard"]), 0.5)
-        return weight * max(0.0, 1.0 - p["distance"] / MAX_NORM_DIST)
+    """The child-hazard pair that drives the danger level."""
     pairs = pair_distances(detections)
-    return max(pairs, key=risk) if pairs else None
+    return max(pairs, key=pair_risk) if pairs else None
+
+
+def person_cards(detections):
+    """One entry per person in danger, most dangerous first:
+    {"pair": their most dangerous pair, "others": other hazards near them}."""
+    per_child = {}
+    for p in pair_distances(detections):
+        if p["zone"] == "SAFE":
+            continue
+        card = per_child.setdefault(p["child"], {"pair": p, "others": 0})
+        if card["pair"] is not p:
+            card["others"] += 1
+            if pair_risk(p) > pair_risk(card["pair"]):
+                card["pair"] = p
+    return sorted(per_child.values(), key=lambda c: -pair_risk(c["pair"]))
+
+
+def risk_card_html(card, top, tech):
+    p = card["pair"]
+    icon, words = ZONE_DISPLAY[p["zone"]]
+    others = card["others"]
+    more = (f'<div class="risk-more">+ {others} other dangerous object{"s" if others > 1 else ""} nearby</div>'
+            if others else "")
+    if tech:
+        depth = "-" if p["child_depth"] is None else f'{p["child_depth"]:.2f}'
+        stats = (f'<div class="risk-stats"><span>Distance <b>{p["distance"]:.2f}</b></span>'
+                 f'<span>Depth <b>{depth}</b></span></div>')
+    else:
+        stats = '<div class="risk-stats"><span><b>Touching</b></span></div>' if p["distance"] < 0.01 else ""
+    return (f'<div class="risk-card risk-{p["zone"].lower()}{" risk-top" if top else ""}">'
+            f'<div class="risk-head">{icon} {escape(p["child"])} is {words} the {escape(nice_name(p["hazard"]))}</div>'
+            f'{stats}{more}</div>')
+
+
+def toggle_show_all(key):
+    ss[key] = not ss.get(key, False)
 
 
 def level_box(level, message):
@@ -534,23 +589,25 @@ def render_assessment(result=None, error=None, stale=False, idle=False, prefix="
         elif pair is None:
             state_box("Nothing to measure", "Needs both a child and a hazard in view.", compact=True)
         else:
-            zone_tone = {"CRITICAL": "severity-high", "WARNING": "severity-medium",
-                         "CAUTION": "severity-low", "SAFE": "severity-safe"}[pair["zone"]]
-            state_box(f"{nice_name(pair['hazard']).capitalize()} is {DISTANCE_TEXT[pair['zone']]} the child",
-                      "Distance is estimated from the camera picture.", zone_tone, compact=True)
+            cards = person_cards(result.detections)
+            if not cards:
+                st.html('<div class="risk-card risk-safe"><div class="risk-head">'
+                        '✅ No child is near a dangerous object</div></div>')
+            show_key = f"preview_{prefix}_prox_all"
+            show_all = ss.get(show_key, False)
+            # Default: only the most dangerous person; "Show all" lists everyone in danger.
+            for i, card in enumerate(cards if show_all else cards[:1]):
+                st.html(risk_card_html(card, top=i == 0, tech=tech))
+            if len(cards) > 1:
+                st.button(f"Hide others" if show_all else f"Show all ({len(cards)} people in danger)",
+                          key=f"{show_key}_btn", type="tertiary", icon=":material/group:",
+                          on_click=toggle_show_all, args=(show_key,))
             if tech:
-                fmt = lambda v: "-" if v is None else f"{v:.2f}"
-                st.dataframe(
-                    [{"Child": p["child"], "Hazard": p["hazard"],
-                      "Child depth": fmt(p["child_depth"]), "Hazard depth": fmt(p["hazard_depth"]),
-                      "Depth diff": fmt(p["depth_diff"]),
-                      "Distance": f'{p["distance"]:.2f}x height', "Zone": p["zone"]}
-                     for p in pair_distances(result.detections)],
-                    hide_index=True, width="stretch")
-                st.caption("Every child-hazard pair, closest first. Distance combines the on-screen "
-                           "gap and the depth difference.")
-                st.caption(result.depth_status)
-                st.caption("Relative distances use the reference person's box height, not metres. "
+                status = result.depth_status
+                if status.startswith("Depth unavailable"):
+                    status = "Depth unavailable; image-plane distance only (details in Settings)."
+                st.caption(status)
+                st.caption("Distance is in the person's box heights, not metres. "
                            "A person detection does not identify age.")
 
 

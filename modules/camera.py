@@ -96,13 +96,18 @@ def draw_result(img, result: ClassificationResult, banner: bool = True):
     """Boxes from the spatial/model part + a coloured danger banner.
     Shared by the live camera and the image tester in app.py."""
     img = img.copy()
+    person_no = 0
     for d in result.detections:
         if d.bbox:
             # Blue = person (child reference), yellow = hazard.
-            color = (255, 160, 0) if d.label in CHILD_LABELS else (0, 255, 255)
+            is_child = d.label.lower().replace(" ", "_") in CHILD_LABELS
+            color = (255, 160, 0) if is_child else (0, 255, 255)
             x1, y1, x2, y2 = d.bbox
             cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
             text = f"{d.label} {d.confidence:.2f}"
+            if is_child:                      # P1, P2 ... match "Person 1" in the side panel
+                person_no += 1
+                text = f"P{person_no} {text}"
             if d.depth is not None:           # 0-1 relative depth, 1 = closest
                 text += f" d={d.depth:.2f}"
             cv2.putText(img, text, (x1, max(y1 - 6, 12)),
