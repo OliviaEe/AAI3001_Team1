@@ -26,7 +26,7 @@ This project is a prototype monitoring assistant. It watches a camera feed, imag
 | Fujita Ayumi | 2502515 | Spatial analysis, proximity calculations, risk scoring and spatial integration |
 | Low Yi Hang Nicholas | 2500831 | Spatial analysis, proximity calculations, risk scoring and spatial integration |
 
-**Shared contributions:** system integration, testing, project discussions and report review.
+**Shared contributions:** system integration, testing, project discussions, README, report and slides review.
 
 ## Documentation
 
@@ -52,8 +52,8 @@ The hazard dataset combines **public online images** and **photographs the team 
 | **ChildSUn** (Kaggle) | 5,350 images of objects categorised as safe (toys, baby items, fruit) or unsafe (knives, sockets, scissors, heaters, forks) for children | [kaggle.com/datasets/fairuzkhan002/datasetvgg19](https://www.kaggle.com/datasets/fairuzkhan002/datasetvgg19) |
 | **Open Images Dataset V7** | Knives, scissors, kitchen scenes, medicine | [Open Images V7 visualiser](https://storage.googleapis.com/openimages/web/visualizer/index.html?type=all&set=train&c=%2Fm%2F01lsmm) |
 | **LVIS** | Knives, scissors, bottles, bottle caps | [platform.ultralytics.com/ultralytics/datasets/lvis](https://platform.ultralytics.com/ultralytics/datasets/lvis) |
-| **Pill-bottles** (Roboflow Universe) | Pill bottles | [universe.roboflow.com/mandam/pill-b1ottles-gtnpm](https://universe.roboflow.com/mandam/pill-b1ottles-gtnpm) |
-| **Harmful Objects** (Roboflow Universe) | Harmful household objects | [universe.roboflow.com/harmfull-objects/harmful-objects-wmmd](https://universe.roboflow.com/harmfull-objects/harmful-objects-wmmd) |
+| **Baby-Danger** (Roboflow Universe) | Unsafe objects for children | [https://universe.roboflow.com/fyp-ytggz/baby-danger](https://universe.roboflow.com/fyp-ytggz/baby-danger) |
+| **Harmful Objects** (Roboflow Universe) | Harmful objects that pose risk | [https://universe.roboflow.com/harmfull-objects/harmful-objects-wmmdi](https://universe.roboflow.com/harmfull-objects/harmful-objects-wmmdi) |
 
 Each source keeps its own licence and terms of use. Check the linked dataset page before redistributing any images. Only the filenames and split assignments are stored in this repo, not the images.
 
@@ -64,14 +64,14 @@ Team members photographed the hazard objects in real homes: on beds, blankets, c
 <table align="center">
   <tr>
     <td align="center"><img src="figures/dataset/pill_bottle_raw.jpg" alt="Self-collected photo of a pill bottle on a cluttered desk" width="280"><br><em>Raw self-collected photo</em></td>
-    <td align="center"><img src="figures/dataset/pill_bottle_labelled.jpg" alt="Same photo with a green bounding box labelled pill_bottle" width="280"><br><em>Labelled in Roboflow</em></td>
+    <td align="center"><img src="figures/dataset/pill_bottle_labelled.jpg" alt="Same photo with a green bounding box labelled pill_bottle" width="280"><br><em>Labelled Ourselves</em></td>
   </tr>
 </table>
 
 #### 3. Annotation
 
-- **Tool:** the team annotated the self-collected photos in **[Roboflow](https://roboflow.com/)**, drawing a bounding box around each hazard object and exporting the labels in YOLO format.
-- **Public images:** labels were converted or relabelled where needed so that every source uses the same 14-class scheme.
+- **Tool:** the team annotated the self-collected photos in tools like **[Roboflow](https://roboflow.com/)**, drawing a bounding box around each hazard object and exporting the labels in YOLO format.
+- **Public images:** labels were checked or relabelled where needed so that every source uses the same 14-class scheme.
 
 **Example: from photo to label.** For the pill bottle photo above, the exported YOLO label file ([pill_bottle_label.txt](figures/dataset/pill_bottle_label.txt)) has one line per object:
 
