@@ -24,7 +24,7 @@ import numpy as np
 import streamlit as st
 from streamlit_webrtc import RTCConfiguration, WebRtcMode, webrtc_streamer
 
-from modules.camera import MAX_CANDIDATES, CameraProcessor, analyse_video, draw_result, pick_best
+from modules.camera import CameraProcessor, analyse_video, draw_result
 from modules.classifier import (
     BaseClassifier, ClassificationResult, DangerLevel, DummyClassifier, get_classifier,
 )
@@ -588,10 +588,10 @@ with navigation:
                                help="480p lags less: every frame is sent to the server and back. "
                                     "Applies the next time the camera starts.")
             max_fps = st.slider("Max model runs / second", 1, 15, 5, key="preview_fps")
-            compare_n = st.slider("Frames compared per result", 1, MAX_CANDIDATES, 5, key="preview_compare",
-                                  help="The live assessment shows the best of the last N analysed frames "
-                                       "(highest danger, then most confident detections) instead of only "
-                                       "the newest frame. 1 = newest frame only.")
+            update_s = st.slider("Update result every (s)", 0.5, 5.0, 2.0, 0.5, key="preview_update",
+                                 help="All frames analysed in this period are compared and the best one "
+                                      "(highest danger, then most confident detections) stays on screen "
+                                      "until the next period ends. A higher danger level still shows at once.")
             show_overlay = st.checkbox("Draw detection overlay", value=True, disabled=is_demo, key="preview_overlay")
             show_depth = st.toggle("Show depth map", value=False, disabled=is_demo, key="preview_show_depth",
                                    help="Coloured relative depth (brighter = closer), like pressing d in "
@@ -733,12 +733,11 @@ with tab_live:
             c.metric("Result age", f"{age:.1f} s" if age is not None else "—")
             st.caption(f"Classifier: {type(classifier).__name__} · Inference limit: {max_fps}/s")
 
-    def best_recent(processor, playing, error):
-        """(best candidate, all candidates) among the last `compare_n` analysed frames."""
+    def shown_frame(processor, playing, error):
+        """(chosen candidate, frames it was picked from, frames scanned this round)."""
         if processor is None or not playing or error:
-            return None, []
-        candidates = processor.recent_candidates(compare_n)
-        return pick_best(candidates), candidates
+            return None, [], 0
+        return processor.shown()
 
     @st.fragment(run_every=0.5)
     def live_status():
@@ -746,17 +745,18 @@ with tab_live:
         stale = age is not None and age > 5.0
         if processor is not None:
             processor.max_infer_fps = max_fps
+            processor.selector.period = update_s
             # The video overlay stays per-frame so the boxes follow the camera.
             processor.draw_overlay = bool(show_overlay and not is_demo and playing and result is not None and not error and not stale)
-        best, _ = best_recent(processor, playing, error)
+        best, _, _ = shown_frame(processor, playing, error)
         frame = None
         if best is not None:
             result, frame = best.result, best.frame
         render_assessment(result, error=error, stale=stale, idle=not playing)
         render_alerts(result, processor, eligible=playing and not error and not stale, frame=frame)
 
-    def candidate_strip(candidates, best, thumb_w=200):
-        """One image: every compared frame side by side, the chosen one outlined."""
+    def candidate_strip(candidates, best, thumb_w=200, per_row=5):
+        """One image: the compared frames in rows of `per_row`, the chosen one outlined."""
         tiles = []
         for i, c in enumerate(candidates, 1):
             img = draw_result(c.frame, c.result, banner=False) if show_overlay and not is_demo else c.frame
@@ -770,17 +770,20 @@ with tab_live:
             border = (142, 136, 16) if chosen else (230, 225, 220)   # teal (BGR) vs light grey
             tiles.append(cv2.copyMakeBorder(img, 5, 5, 5, 5, cv2.BORDER_CONSTANT, value=border))
         height = max(t.shape[0] for t in tiles)
-        tiles = [cv2.copyMakeBorder(t, 0, height - t.shape[0], 0, 4, cv2.BORDER_CONSTANT,
-                                    value=(252, 249, 247)) for t in tiles]
-        return np.hstack(tiles)
+        bg = (252, 249, 247)
+        tiles = [cv2.copyMakeBorder(t, 0, height - t.shape[0] + 4, 0, 4, cv2.BORDER_CONSTANT, value=bg)
+                 for t in tiles]
+        blank = np.full_like(tiles[0], bg)
+        tiles += [blank] * (-len(tiles) % per_row)          # pad the last row
+        return np.vstack([np.hstack(tiles[i:i + per_row]) for i in range(0, len(tiles), per_row)])
 
     @st.fragment(run_every=1.0)
     def selected_frame_card():
         processor, playing, _, error, _ = live_snapshot()
-        best, candidates = best_recent(processor, playing, error)
+        best, candidates, scanning = shown_frame(processor, playing, error)
         with st.container(border=True, key="preview_selected_frame"):
             st.html('<div class="camera-card-header"><strong>Selected frame</strong><span class="camera-view-tag">'
-                    f'Best of last {compare_n} analysed frame{"s" if compare_n > 1 else ""}</span></div>')
+                    f'Best frame, updates every {update_s:g}s</span></div>')
             if best is None:
                 state_box("No frames analysed yet",
                           "Start monitoring. The frame used for the assessment will appear here.", compact=True)
@@ -788,8 +791,8 @@ with tab_live:
             shown = draw_result(best.frame, best.result, banner=not is_demo) if show_overlay and not is_demo else best.frame
             pos = candidates.index(best) + 1
             st.image(shown, channels="BGR", width="stretch",
-                     caption=f"Frame #{pos} of {len(candidates)} · {time.monotonic() - best.t:.1f}s ago · "
-                             f"{best.result.level.name} ({best.result.score:.2f})")
+                     caption=f"Frame #{pos} of {len(candidates)} compared · {best.result.level.name} "
+                             f"({best.result.score:.2f}) · scanning next round: {scanning} frame(s)")
             if len(candidates) > 1:
                 st.image(candidate_strip(candidates, best), channels="BGR", width="stretch",
                          caption="Compared frames, oldest to newest. Picked: highest danger score, "
