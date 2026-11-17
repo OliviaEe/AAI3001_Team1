@@ -173,10 +173,26 @@ scores (set **Level must last** to 0 in Settings to trigger one quickly).
 
 WebRTC uses the viewer's browser camera. For Streamlit Community Cloud, point
 the deployment to `app.py` and enter the bot token in App settings -> Secrets.
-Model hosting requirements depend on the selected model. Restrictive networks
-may require a TURN server in `RTC_CONFIG` in `app.py`.
+Model hosting requirements depend on the selected model. For remote camera
+connection issues, configure Metered TURN as described below.
 
 Subscriptions are stored in local `subscribers.db` (SQLite). Hosts that wipe the disk
 on restart (e.g. Streamlit Community Cloud) need persistent storage or a hosted
 database (Postgres/Supabase) behind the same `SubscriptionStore` methods. Only one
 running server may poll the bot; with several servers, switch the bot to a webhook.
+
+### Cloud camera setup
+
+Add your Metered TURN credentials to **Streamlit App settings > Secrets**, keeping
+the existing Telegram setting:
+
+```toml
+METERED_TURN_USERNAME = "your-turn-username"
+METERED_TURN_PASSWORD = "your-turn-password"
+```
+
+Save and reboot the app. New Metered credentials can take up to two minutes to
+activate. Check **Performance details** for **Metered TURN configured**, then test
+the camera on the affected device. Keep credentials private and stop monitoring
+after testing to conserve the free allowance. TURN improves connectivity; it does
+not increase Streamlit's CPU resources.
