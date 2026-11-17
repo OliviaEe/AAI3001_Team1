@@ -33,6 +33,10 @@ from modules.subscriptions import SubscriptionStore, start_poller
 from modules.spatial import CHILD_LABELS, DANGER_WEIGHTS, ScoreHold, pair_distances
 from modules.spatial_pipeline import MAX_DEPTH_AGE, colorize_depth
 
+# Zone -> (icon, plain words) for the caregiver-facing proximity cards.
+ZONE_DISPLAY = {"CRITICAL": ("🔴", "very close to"), "WARNING": ("🟠", "close to"),
+                "CAUTION": ("🟡", "near"), "SAFE": ("🟢", "far from")}
+
 
 st.set_page_config(page_title="Child Safety Monitor", page_icon="🛡️", layout="wide")
 st.html("""
@@ -122,6 +126,18 @@ h3 { font-size: 1.1rem !important; }
 .camera-placeholder p { font-size: 14px; color: #64748b; margin-top: 8px; }
 .object-row { padding: 10px 0; border-bottom: 1px solid #e4eaf1; display: flex; justify-content: space-between; }
 .object-row span { color: #64748b; }
+.risk-card { border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; border: 1px solid; }
+.risk-card .risk-head { font-weight: 700; font-size: 15px; }
+.risk-card .risk-stats { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 4px; font-size: 13px; color: #475569; }
+.risk-card .risk-stats b { font-size: 16px; color: #102240; }
+.risk-card .risk-more { margin-top: 4px; font-size: 12px; color: #64748b; }
+.risk-card.risk-top { padding: 14px 16px; border-width: 2px; }
+.risk-card.risk-top .risk-head { font-size: 18px; }
+.risk-card.risk-top .risk-stats b { font-size: 20px; }
+.risk-critical { background: #ffebeb; border-color: #efaaaa; } .risk-critical .risk-head { color: #a51f1f; }
+.risk-warning { background: #fff0e0; border-color: #f4b16a; } .risk-warning .risk-head { color: #9a4600; }
+.risk-caution { background: #fff7d6; border-color: #ead27b; } .risk-caution .risk-head { color: #806000; }
+.risk-safe { background: #e9f8ef; border-color: #9fd8b5; } .risk-safe .risk-head { color: #126c40; }
 .footer { margin-top: 25px; text-align: right; font-size: 12px; color: #6b7c93; }
 /* Desktop composition follows the reference; the camera scales with viewport height. */
 :root { --camera-height: clamp(220px, calc(100dvh - 435px), 650px); }
@@ -456,17 +472,33 @@ def render_assessment(result=None, error=None, stale=False, idle=False, prefix="
         elif result is not None and not (error or stale or idle):
             st.write(result.reason or "No spatial explanation provided.")
             pairs = pair_distances(result.detections)
-            if pairs:
-                fmt = lambda v: "–" if v is None else f"{v:.2f}"
-                st.dataframe(
-                    [{"Child": p["child"], "Hazard": p["hazard"],
-                      "Child depth": fmt(p["child_depth"]), "Hazard depth": fmt(p["hazard_depth"]),
-                      "Depth diff": fmt(p["depth_diff"]),
-                      "Distance": f'{p["distance"]:.2f}× height', "Zone": p["zone"]}
-                     for p in pairs],
-                    hide_index=True, width="stretch")
-                st.caption("Every child–hazard pair, closest first. Distance combines the on-screen "
-                           "gap and the depth difference; the danger score uses the closest pair.")
+            at_risk = [p for p in pairs if p["zone"] != "SAFE"]
+            if pairs and not at_risk:
+                st.html('<div class="risk-card risk-safe"><div class="risk-head">'
+                        '✅ No child is near a dangerous object</div></div>')
+            # One card per child: their closest object (pairs are sorted closest first).
+            per_child = {}
+            for p in at_risk:
+                per_child.setdefault(p["child"], {"pair": p, "others": 0})
+                if per_child[p["child"]]["pair"] is not p:
+                    per_child[p["child"]]["others"] += 1
+            cards = list(per_child.values())
+            for i, card in enumerate(cards[:4]):    # closest first; the first card is the main warning
+                p = card["pair"]
+                icon, word = ZONE_DISPLAY[p["zone"]]
+                hazard = escape(p["hazard"])
+                distance = "Touching" if p["distance"] < 0.01 else f'{p["distance"]:.2f}'
+                depth = "–" if p["child_depth"] is None else f'{p["child_depth"]:.2f}'
+                others = card["others"]
+                more = (f'<div class="risk-more">+ {others} other dangerous object{"s" if others > 1 else ""} nearby</div>'
+                        if others else "")
+                st.html(
+                    f'<div class="risk-card risk-{p["zone"].lower()}{" risk-top" if i == 0 else ""}">'
+                    f'<div class="risk-head">{icon} {escape(p["child"])} is {word} the {hazard}</div>'
+                    f'<div class="risk-stats"><span>Distance <b>{distance}</b></span>'
+                    f'<span>Depth <b>{depth}</b></span></div>{more}</div>')
+            if len(cards) > 4:
+                st.caption(f"+ {len(cards) - 4} more children near dangerous objects")
             status = result.depth_status
             if status.startswith("Depth unavailable"):
                 status = "Depth unavailable; image-plane distance only (details in Settings)."
