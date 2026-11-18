@@ -67,7 +67,7 @@ Normalising by person height gives a relative unit. For example, a 60-pixel gap 
 
 ## Relative-depth sampling and adjustment
 
-Depth Anything V2 Small is loaded lazily and reused. The implementation sets depth input dimensions to **252 × 252** for the processing trade-off recorded in the code. No end-to-end speed guarantee follows from that setting.
+Depth Anything V2 Small is loaded and reused. The implementation sets depth input dimensions to **252 × 252** for the processing trade-off recorded in the code. No end-to-end speed guarantee follows from that setting.
 
 Depth is sampled as the median of the **central 50% of each box's width and height**, reducing influence from box corners. It is normalised using the same map's **2nd and 98th percentiles**, clipped to [0, 1], with larger values treated as nearer the camera. A nearly flat map gives the neutral value 0.5. These are frame-relative values, not metres and not stable coordinates across different frames.
 
@@ -152,8 +152,6 @@ Live scores rise immediately but persist through brief drops using a **one-secon
 </table>
 
 The existing `medicine_syrup -> liquid_medicine` alias handles an older fine-grained label, not the final `medicine` group. UI hazard-presence checks also use the dictionary, so grouped labels can be present in detector outputs without being treated as recognised hazards downstream.
-
-Before relying on the trained pipeline, the team must agree on group-level risk policies, align spatial and UI handling, add tests for all seven final labels and verify real model-to-app outputs. This documentation does not select new risk weights or change behaviour. The detector results establish neither that mapping nor the safety of the integrated system.
 
 ## Existing checks and what they do not establish
 
