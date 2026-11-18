@@ -13,8 +13,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 # Keep model CPU work from occupying every core in this UI process.
-os.environ.setdefault("OMP_NUM_THREADS", "2")
-os.environ.setdefault("MKL_NUM_THREADS", "2")
+# MODEL_THREADS (default 2) raises the limit on servers with more cores.
+os.environ.setdefault("OMP_NUM_THREADS", os.getenv("MODEL_THREADS", "2"))
+os.environ.setdefault("MKL_NUM_THREADS", os.getenv("MODEL_THREADS", "2"))
 os.environ.setdefault("OMP_WAIT_POLICY", "PASSIVE")
 os.environ.setdefault("KMP_BLOCKTIME", "0")
 
@@ -315,7 +316,8 @@ class TimedClassifier(BaseClassifier):
     @staticmethod
     def _configure_depth_thread():
         import torch
-        torch.set_num_threads(2)
+        from modules.classifier import model_threads
+        torch.set_num_threads(model_threads())
 
     def predict(self, frame_bgr: np.ndarray) -> ClassificationResult:
         if self._depth_pool is not None:
