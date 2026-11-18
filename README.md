@@ -184,12 +184,12 @@ libgl1
 libglib2.0-0t64
 ```
 
-The Telegram bot token is configured through Streamlit's Secrets settings.
+The Telegram bot token and Cloudflare TURN credentials are configured through Streamlit's Secrets settings. Cloudflare TURN provides a video relay when a direct camera connection cannot be established. The Cloudflare credentials remain in Secrets.
 
 For remote camera connection issues, see the
 [cloud camera setup](docs/UI_GUIDE.md#cloud-camera-setup).
 
-Cloud testing confirmed that uploaded-image inference, live camera monitoring, and Telegram alert delivery work. Processing speed depends on the available cloud resources and network connection. Local database storage is not guaranteed to persist across cloud rebuilds or restarts.
+Cloud testing confirmed that uploaded-image inference, live camera monitoring, and Telegram alert delivery work. A teammate who previously could not connect their camera successfully tested live monitoring after Cloudflare TURN was configured. Processing speed depends on the available cloud resources and network connection. TURN improves connectivity but does not increase the app's CPU resources. Local database storage is not guaranteed to persist across cloud rebuilds or restarts.
 
 ## Experiment records in this repository
 
