@@ -2,18 +2,6 @@
 
 A team computer-vision prototype combining hazard detection, a person reference, relative-depth/spatial analysis, a Streamlit interface and Telegram caregiver alerts.
 
-## Project overview
-
-Young children explore by touching and mouthing objects. Button batteries, coins, small toys, medicines and sharp tools are common household items that can cause choking, poisoning or injury. Caregivers can't watch a child every second.
-
-This project is a prototype monitoring assistant. It watches a camera feed, image or video and:
-
-1. **Detects household hazards** with a custom-trained YOLOv8 model (seven hazard groups).
-2. **Detects people** with a stock COCO person detector, used as the reference point for proximity. For demo purposes, any detected person stands in for the child.
-3. **Estimates relative depth** with Depth Anything V2 Small to tell whether a hazard is at roughly the same depth as the person or far behind or in front of them.
-4. **Scores spatial risk** from the image-plane gap, the depth gap and the hazard type, then shows a SAFE, CAUTION, WARNING or CRITICAL level in a Streamlit dashboard.
-5. **Alerts caregivers** through Telegram when risk stays high, with duration and cooldown controls to limit repeated messages.
-
 ## Team and Contributions
 
 **Team:** AAI3001 — Lab P1, Group 1
@@ -28,16 +16,39 @@ This project is a prototype monitoring assistant. It watches a camera feed, imag
 
 **Shared contributions:** system integration, testing, project discussions, README, report and slides review.
 
+## Project overview
+
+The prototype addresses camera monitoring of potentially hazardous household objects, including batteries, small items, medicines and sharp tools. It aims to support caregiver awareness while retaining the detection and spatial limitations described below.
+
+This project is a prototype monitoring assistant. It watches a camera feed, image or video and:
+
+1. **Detects household hazards** with a custom-trained YOLOv8 model (seven hazard groups).
+2. **Detects people** with a stock COCO person detector, used as the reference point for proximity. For demo purposes, any detected person stands in for the child.
+3. **Estimates relative depth** with Depth Anything V2 Small to compare frame-relative depth at the person and hazard boxes. These values are not physical distances.
+4. **Scores spatial risk** from the image-plane gap, the depth gap and the hazard type, then displays a `SAFE`, `LOW`, `MEDIUM` or `HIGH` assessment. The spatial explanation separately uses geometric zones named SAFE, CAUTION, WARNING and CRITICAL.
+5. **Supports caregiver alerts** through Telegram when the configured level and duration conditions are met, with a cooldown to limit repeated messages.
+
 ## Documentation
 
 | Guide | What it covers |
 |:---:|:---|
 | [UI and application guide](docs/UI_GUIDE.md) | Installation, camera controls, image/video testing, spatial/depth integration, Telegram and deployment |
 | [Model experiments, results and limitations](docs/MODEL_RESULTS.md) | Baseline and six experiments, evaluation protocol, selected configuration, findings, limitations, future work and artifact records |
-| [Spatial analysis and integration](docs/SPATIAL_ANALYSIS.md) | Relative box distance, depth sampling, risk formula, temporal handling, tests and seven-class integration gap |
+| [Spatial analysis and integration](docs/SPATIAL_ANALYSIS.md) | Relative box distance, depth sampling, risk formula, temporal handling, tests and seven-class risk mapping |
+| [Cloud deployment guide](docs/DEPLOYMENT.md) | Streamlit Community Cloud, Google Cloud setup, camera relay, costs and operational checks |
 | [Executed notebook](Child_Safety_Hazard_Detection_YOLOv8.ipynb) | Full preparation/training/evaluation code and recorded outputs |
 
 > **Reading the report on GitHub:** the executed notebook is approximately 38 MB and may be too large for GitHub's notebook preview. The [model guide](docs/MODEL_RESULTS.md) is written to stand alone, with readable result tables and figures. Download the notebook and open it in Jupyter or VS Code if you need the full executed cells.
+
+## Quick start
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+Obtain the selected checkpoint separately and place it at `weights/final_best.pt`, or configure `HAZARD_MODEL_PATH`. Weights are ignored by Git. Without the trained checkpoint, the app uses a stock-model demonstration. If pipeline construction fails, the app displays an error and uses a random-score fallback. Neither is equivalent to the selected seven-group detector. See the [UI guide](docs/UI_GUIDE.md).
 
 ## Dataset
 
@@ -45,21 +56,23 @@ This project is a prototype monitoring assistant. It watches a camera feed, imag
 
 The hazard dataset combines **public online images** and **photographs the team took and labelled**:
 
-#### 1. Public datasets
+#### 1. Public datasets (selected sources)
 
-| Source | What we used it for | Link |
+The table below lists some of the public datasets used during data collection. It is not a complete inventory of every source contributing to the final dataset.
+
+| Source | Images/categories sourced | Link |
 |:---|:---|:---|
-| **ChildSUn** (Kaggle) | 5,350 images of objects categorised as safe (toys, baby items, fruit) or unsafe (knives, sockets, scissors, heaters, forks) for children | [kaggle.com/datasets/fairuzkhan002/datasetvgg19](https://www.kaggle.com/datasets/fairuzkhan002/datasetvgg19) |
+| **ChildSUn** (Kaggle) | Source dataset contains 5,350 images categorised as safe or unsafe for children. This is the source dataset size, not a verified count of images retained in our final dataset. | [kaggle.com/datasets/fairuzkhan002/datasetvgg19](https://www.kaggle.com/datasets/fairuzkhan002/datasetvgg19) |
 | **Open Images Dataset V7** | Knives, scissors, kitchen scenes, medicine | [Open Images V7 visualiser](https://storage.googleapis.com/openimages/web/visualizer/index.html?type=all&set=train&c=%2Fm%2F01lsmm) |
 | **LVIS** | Knives, scissors, bottles, bottle caps | [platform.ultralytics.com/ultralytics/datasets/lvis](https://platform.ultralytics.com/ultralytics/datasets/lvis) |
 | **Baby-Danger** (Roboflow Universe) | Unsafe objects for children | [https://universe.roboflow.com/fyp-ytggz/baby-danger](https://universe.roboflow.com/fyp-ytggz/baby-danger) |
 | **Harmful Objects** (Roboflow Universe) | Harmful objects that pose risk | [https://universe.roboflow.com/harmfull-objects/harmful-objects-wmmdi](https://universe.roboflow.com/harmfull-objects/harmful-objects-wmmdi) |
 
-Each source keeps its own licence and terms of use. Check the linked dataset page before redistributing any images. Only the filenames and split assignments are stored in this repo, not the images.
+Each source keeps its own licence and terms of use. Check the linked dataset page before redistributing any images. The full image dataset is stored separately. This repository includes split assignments and selected illustrative images, such as the examples below.
 
 #### 2. Self-collected photographs
 
-Team members photographed the hazard objects in real homes: on beds, blankets, clutter, floors and tables, under ordinary indoor lighting. These photos add the cluttered, patterned backgrounds and casual phone-camera angles that the public datasets mostly lack, and that a home monitoring camera is likely to see.
+Team members photographed the hazard objects in real homes: on beds, blankets, clutter, floors and tables, under ordinary indoor lighting. These photos add cluttered backgrounds and everyday phone-camera viewpoints. Their coverage of the intended monitoring conditions still needs evaluation.
 
 <table align="center">
   <tr>
@@ -103,7 +116,7 @@ The original annotations use **14 classes**, which are grouped into **7 hazard g
 | 5 | `sharp` | knife, scissors |
 | 6 | `medicine` | medicine_syrup, pill_bottle, pill_packet |
 
-Grouping matches the app's alert categories. It is a design choice, not a proven accuracy improvement, and a group prediction cannot tell you the original fine-grained item (for example knife vs scissors).
+Grouping reflects the intended hazard categories. It is a design choice, not a demonstrated accuracy improvement. Predictions identify the group rather than the original item, such as knife versus scissors. The current spatial mapping recognises all seven groups; their risk weights, including the combined pen/pen-cap group, still require validation.
 
 ### Cleaning and splitting
 
@@ -127,27 +140,17 @@ Per-image split assignments are in [results/split_membership.csv](results/split_
 
 Experiment 6 obtains **96.63% crop-validation accuracy**, but adding it to the detector increases missed hazards and false detections. It is retained as an experiment, not recommended for the final operating configuration.
 
-## Known Limitations
+## Experiment records in this repository
 
-### Design priority: catching hazards first
+- `results/validation/`: recorded validation scores and threshold sweeps.
+- `results/final_test/`: detector, pipeline, class, size and controlled-condition CSV results.
+- `results/training_history/`: original epoch histories and run arguments for the completed baseline and Experiments 1–6.
+- `results/split_membership.csv`: exported filenames, categories, photo groups and split assignments; no image files.
+- `figures/model_training/`: selected evaluation and training figures.
+- `configs/model_training/selected_detector.json`: recommended settings and seven-class mapping. This is a record, not an automatically loaded app configuration.
+- `configs/model_training/artifact_manifest.json`: source runs, checkpoint hashes, notebook hash and copied-record checksums.
 
-In child safety, missing a real hazard is far more costly than raising an extra alert. A false alarm costs the caregiver a quick glance. A missed button battery or open pill bottle could end up in a child's mouth. The system is therefore designed for this side of caution**:
-
-- **Low confidence threshold (`0.30`):** borderline detections are kept rather than discarded, so possible hazards are still flagged.
-
-### Hazard detection
-
-- **Errors in both directions remain.** On the clean test set (2,568 images) there were **546 false detections and 469 missed objects**. Under synthetic stress (blur, noise, lighting changes), misses rose to **721**.
-- **Small objects are the weakest case.** Recall is about 0.65 for objects 16–32 px across, compared with 0.92 for objects 64 px or larger. That's exactly the size of coins and button batteries seen from a distance.
-- **Weaker classes:** `pen` (0.70 recall under stress), `sharp` (0.75) and `battery` (0.77).
-- **No detection does not mean the scene is safe.**
-
-### Spatial analysis and relative depth
-
-- **Proximity is not a real distance.** It is the gap between bounding boxes divided by the person's box height, so it isn't in metres. Posture, camera angle and people cut off at the frame edge all change it. Overlapping boxes don't mean contact.
-- **Depth is relative, not metric.** Depth Anything V2 gives 0–1 values per frame, not centimetres. It can be wrong on glass, mirrors, plain surfaces and very small objects. It samples the centre of each box, which for a person is the torso rather than the reaching hand.
-- **Live depth can lag.** A depth map up to 1.5 s old is still used, so it may describe an earlier moment in a fast-moving scene.
-- **The risk score is hand-tuned.** Hazard weights, distance thresholds and the 0.30 "held object" depth allowance were set by the team. They weren't learned from data or tested against real injury risk.
+Large datasets, generated image folders and model checkpoints remain outside normal Git tracking. Their locations and access requirements are documented in the [model guide](docs/MODEL_RESULTS.md#artifact-locations-and-verification).
 
 ## System scope and integration status
 
@@ -157,19 +160,40 @@ Camera/image/video -> trained hazard detector ----+
                   -> relative-depth estimation --+
 ```
 
-The person detector does not establish age. Relative proximity is not a distance measurement in metres, and absence of detections is not proof of safety.
+The selected checkpoint supplies seven hazard groups. The current spatial mapping includes all seven, including `small_object`, `sharp` and `medicine`. Group coverage is implemented, while the risk policy still requires validation. In particular, the combined `pen` group includes pen caps but retains the legacy pen weight. See [current label handling](docs/SPATIAL_ANALYSIS.md#seven-class-integration-and-remaining-checks).
 
-**Integration work remains:** the selected model outputs seven hazard groups, while the current app spatial weights still use the legacy fourteen-class labels. The spatial filter currently excludes `small_object`, `sharp` and `medicine`; the merged `pen` group retains the old pen weight. See the [spatial integration gap](docs/SPATIAL_ANALYSIS.md#seven-class-integration-gap) before relying on risk levels. Model evaluation does not validate the complete live camera/depth/alert pipeline. App code is unchanged by this documentation update.
+The model study evaluates hazard detection on annotated images. The [spatial guide](docs/SPATIAL_ANALYSIS.md) explains proximity assumptions, depth freshness and score persistence; the [UI guide](docs/UI_GUIDE.md) covers camera operation and alert configuration.
 
-## Quick start
+## Known Limitations
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m streamlit run app.py
-```
+### Detection trade-off
 
-Obtain the selected checkpoint separately and place it at `weights/final_best.pt`, or configure `HAZARD_MODEL_PATH`. Weights are ignored by Git. Without the trained checkpoint, the app uses its stock-model demo/fallback as described in the [UI guide](docs/UI_GUIDE.md).
+The project prioritises recovering hazards while monitoring false detections. The confidence threshold `0.30` was selected on validation to minimise false detections per image among tested thresholds meeting overall recall of at least `0.85`. This is a project criterion, not a validated safety standard. False alerts can also distract or fatigue caregivers, so their cost should not be dismissed.
+
+### Hazard detection
+
+| Selected detector at confidence 0.30 | Clean test | Synthetic stress |
+|:---|:---:|:---:|
+| False detections | 546 | 366 |
+| Missed objects | 469 | 721 |
+
+- **Errors in both directions remain.** The clean test contains 2,568 images. These are object-level counts, not caregiver-alert counts. Under stress, fewer false detections occur alongside more missed hazards.
+- **Small objects remain difficult.** Recall is about `0.65` for objects with a shorter side of 16–32 model-input pixels, compared with `0.92` at 64+ pixels. These measurements do not establish a physical operating distance.
+- **Some classes are weaker.** Stress recall is approximately `0.70` for pen, `0.75` for sharp objects and `0.77` for battery.
+- **Camera conditions can differ from the test data.** Synthetic blur, noise and lighting changes do not replace independent testing in representative homes. A frame with no detections does not establish that the scene is safe.
+
+See [model failures and limitations](docs/MODEL_RESULTS.md#failure-analysis-and-practical-consequences) for class, size and confidence analyses.
+
+### Spatial analysis and relative depth
+
+- **Proximity is relative, not measured in metres.** The image-plane calculation divides box-edge separation by the person's box height. Posture, camera angle and truncated detections affect it; overlapping boxes do not establish contact.
+- **Depth is relative, not metric.** The pipeline normalises the depth map within each frame and samples the central part of each detection box. The person's sampled region does not necessarily represent a reaching hand. Reflective surfaces, transparent objects and very small objects require additional evaluation.
+- **Depth can describe an earlier frame.** Live assessment accepts a depth map only while its source-frame age is at most `1.5 seconds`; older maps fall back to image-plane proximity. Even an accepted map can lag a moving scene.
+- **Displayed scores can persist.** A one-second score hold and smoothing reduce flicker but delay clearance after the raw risk falls. This is separate from model processing latency.
+- **Risk weights are manually assigned.** Hazard weights, distance thresholds and the `0.30` foreground-held-object depth allowance have not been validated against physical reach or injury risk. All seven labels are recognised, but the merged pen/pen-cap group still uses the legacy pen weight of `0.30` and needs review.
+- **A detected person is only a reference.** The model does not identify age. SAFE is a computed application state, not a safety certification.
+
+See [spatial assumptions and remaining checks](docs/SPATIAL_ANALYSIS.md#seven-class-integration-and-remaining-checks) for formulas, timing behaviour and implementation details. Detector evaluation alone does not validate the complete camera/depth/alert pipeline.
 
 ## Cloud Deployment
 
@@ -205,7 +229,7 @@ Cloud testing confirmed that uploaded-image inference, live camera monitoring, a
 
 ### Google Cloud (backup)
 
-If Streamlit Community Cloud is down, asleep or too slow for a demo, the same `app.py` can run on a Google Cloud Compute Engine virtual machine (VM). It is a dedicated server, so live monitoring is faster, but it costs money while running and is started only when needed. One PowerShell script on your PC, [`deploy/gcp/vm.ps1`](deploy/gcp/vm.ps1), creates, updates, starts and stops it. The VM opens **no inbound ports**:
+If Streamlit Community Cloud is down, asleep or too slow for a demo, the same `app.py` can run on a Google Cloud Compute Engine virtual machine (VM). It provides dedicated resources and incurs charges while running. The performance table below records the team's CPU-server measurements; results depend on workload and hardware. One PowerShell script on your PC, [`deploy/gcp/vm.ps1`](deploy/gcp/vm.ps1), creates, updates, starts and stops it. The VM opens **no inbound ports**:
 
 ```text
 Browser --HTTPS-->  Cloudflare quick tunnel  --> VM: Streamlit on 127.0.0.1:8501 (systemd service)
@@ -223,7 +247,7 @@ Browser <--video--> Cloudflare TURN relay   <--> VM: streamlit-webrtc (aiortc)
 | CPU (default) | `c3-highcpu-8`: 8 vCPU, 16 GB RAM | US$0.35–0.40 / hour | Used for testing so far |
 | GPU (`-Gpu`) | `n1-standard-4` + NVIDIA T4: 4 vCPU, 15 GB RAM | ≈ US$0.60 / hour | Needs GPU quota first; not yet tested |
 
-Both use zone `asia-southeast1-b` (Singapore). A stopped VM costs nothing for compute; its 30–40 GB disk costs a few dollars a month. Prices are estimates; check the [Google Cloud pricing calculator](https://cloud.google.com/products/calculator).
+Both use zone `asia-southeast1-b` (Singapore). A stopped VM costs nothing for compute; its 30–40 GB disk costs a few dollars a month. The prices above are recorded estimates rather than current quotes; check the [Google Cloud pricing calculator](https://cloud.google.com/products/calculator).
 
 #### Prerequisites (once)
 
@@ -232,7 +256,7 @@ Both use zone `asia-southeast1-b` (Singapore). A stopped VM costs nothing for co
    gcloud services enable compute.googleapis.com
    ```
    Add a budget alert under **Billing → Budgets & alerts**. Budgets only send emails; they do not stop spending.
-2. **Cloudflare TURN key.** Use the same TURN key ID and API token as the Streamlit Community Cloud Secrets, or create a key in the Cloudflare dashboard under **Realtime → TURN Server** (free account; the first 1,000 GB per month are free).
+2. **Cloudflare TURN key.** Use the same TURN key ID and API token as the Streamlit Community Cloud Secrets, or create a key in the Cloudflare dashboard under **Realtime → TURN Server** (check Cloudflare's current usage allowance and pricing before deployment).
 3. **`.env` file.** Copy [`.example.env`](.example.env) to `.env` and fill in the values below. `.env` is ignored by Git. Never commit keys or tokens.
 4. **GPU only.** Request GPU quota: **IAM & Admin → Quotas**, search "GPUs (all regions)", request **1**.
 
@@ -275,17 +299,17 @@ Add `-Gpu` to every command to manage the GPU server instead. Its first `setup` 
 - **The first page load after a start takes about a minute** while the models load.
 - In the Cloud Console (**Compute Engine → VM instances**) you can also start or stop the VM, but run `url` afterwards to get the link.
 
-#### Performance (CPU server)
+#### Measured processing latency (CPU server)
 
-Measured in the live app (**Performance details → Latency**, with all three models running per frame):
+Team-recorded timings from the live app (**Performance details → Latency**). These measurements describe the processing shown by that panel, not camera-to-notification latency or a guaranteed frame rate:
 
-| `MODEL_THREADS` | Latency per frame |
+| `MODEL_THREADS` | Reported processing latency per frame |
 |:---:|:---:|
 | 2 (laptop default) | 140–190 ms |
 | **4 (VM default)** | **100–130 ms** |
 | 6 | 115–135 ms |
 
-More threads is not always faster: the detectors and the depth model run at the same time and compete for cores. At about 120 ms per frame, **Settings → Max model runs / second** can be raised from 5 to about 8.
+In these measurements, using more threads did not consistently reduce latency. Detection and background depth processing compete for CPU resources. The **Max model runs / second** setting controls inference scheduling; increasing it does not guarantee an equivalent camera frame rate. Capture, network transport, rendering and alert delivery add separate delays.
 
 #### Notes
 
@@ -293,14 +317,4 @@ More threads is not always faster: the detectors and the depth model run at the 
 - **Subscriptions persist** on the VM's disk (`subscribers.db`) across stop and start, unlike Streamlit Community Cloud. They are lost if the VM is deleted.
 - **TURN credentials reach the browser.** They are short-lived (at most about 2 hours). Deleting the TURN key in Cloudflare disables the relay immediately.
 
-## Experiment records in this repository
-
-- `results/validation/`: recorded validation scores and threshold sweeps.
-- `results/final_test/`: detector, pipeline, class, size and controlled-condition CSV results.
-- `results/training_history/`: original epoch histories and run arguments for the completed baseline and Experiments 1–6.
-- `results/split_membership.csv`: exported filenames, categories, photo groups and split assignments; no image files.
-- `figures/model_training/`: selected evaluation and training figures.
-- `configs/model_training/selected_detector.json`: recommended settings and seven-class mapping. This is a record, not an automatically loaded app configuration.
-- `configs/model_training/artifact_manifest.json`: source runs, checkpoint hashes, notebook hash and copied-record checksums.
-
-Large datasets, generated image folders and model checkpoints remain outside normal Git tracking. Their locations and access requirements are documented in the [model guide](docs/MODEL_RESULTS.md#artifact-locations-and-verification).
+For a separate setup reference, see the [deployment guide](docs/DEPLOYMENT.md).

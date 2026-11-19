@@ -4,7 +4,7 @@
 
 This is the standalone technical account of the model work: the problem, experimental decisions, evidence, limitations and deployment implications. Readers do not need to open the notebook to understand the findings. The notebook remains the implementation and executed evidence record; CSVs and figures provide smaller, directly readable supporting artifacts.
 
-> **Notebook preview:** the executed notebook is approximately 38 MB and contains extensive training logs and embedded outputs. GitHub may fail to render it or report that it is too large to display. Read this guide and the linked CSVs/figures in GitHub; download the `.ipynb` and open it locally in Jupyter or VS Code when the executed cells are needed. A preview failure does not mean the results are missing. Notebook code and saved outputs are unchanged by this documentation update.
+> **Notebook preview:** the executed notebook is approximately 38 MB and contains extensive training logs and embedded outputs. GitHub may fail to render it or report that it is too large to display. Read this guide and the linked CSVs/figures in GitHub; download the `.ipynb` and open it locally in Jupyter or VS Code when the executed cells are needed. A preview failure does not mean the results are missing. The recorded outputs remain the evidence for the results below.
 
 ## Reading guide
 
@@ -232,7 +232,7 @@ The experiment measures annotated-image detection, not the correctness of spatia
   <tbody>
     <tr><td align="center">Physical detection range</td><td align="center">Input pixels do not specify distance in metres; object size and camera optics vary</td><td align="center">Record actual object dimensions, distances, camera setup and successes/failures</td></tr>
     <tr><td align="center">Empty-scene / caregiver false alarms</td><td align="center">Evaluation contains no labelled-empty scenes; false boxes are not notifications</td><td align="center">Label empty and realistic background scenes, then evaluate complete alert events</td></tr>
-    <tr><td align="center">Seven-group spatial integration</td><td align="center">Current spatial filtering excludes <code>small_object</code>, <code>sharp</code> and <code>medicine</code>; merged <code>pen</code> uses a legacy weight</td><td align="center">Agree on grouped risk policies and test every final label through the complete app</td></tr>
+    <tr><td align="center">Seven-group spatial integration</td><td align="center">All seven groups are recognised, but group risk weights lack real-world validation; merged <code>pen</code> still uses a legacy weight</td><td align="center">Agree on grouped risk policies and test every final label through the complete app</td></tr>
     <tr><td align="center">Live depth and timing</td><td align="center">Frame-relative depth, freshness fallback and score persistence affect the displayed result</td><td align="center">Measure detection latency, depth age, score clearance and notification delay on deployment hardware</td></tr>
     <tr><td align="center">Unseen-household generalisation</td><td align="center">Synthetic variants reuse the photographed objects/scenes</td><td align="center">Evaluate a separately collected, representative camera set before tuning against it</td></tr>
   </tbody>
@@ -248,9 +248,9 @@ Evidence: [class results](../results/final_test/selected_model_classes.csv), [si
 2. Evaluate the same objects under recorded camera distance, lighting, placement and capture resolution; measure end-to-end delay and alert outcomes.
 3. Repeat key configurations across seeds before treating small differences as conclusive.
 4. Investigate classifier proposal crops, rejected true hazards and reclassification errors before further pipeline use.
-5. Integrate `final_best.pt` with input 640 and confidence 0.30. Preserve model class names, keep Exp6 disabled, and review the legacy spatial mapping for grouped `small_object`, `sharp`, `medicine` and `pen` labels. A group-level prediction cannot recover the original fine-grained class.
+5. Use `final_best.pt` with input 640 and confidence 0.30. Preserve the seven model class names, keep the Exp6 crop classifier out of the recommended path, and validate the grouped spatial weights, particularly the combined pen/pen-cap policy.
 
-The current `modules/spatial.py` risk weights use fourteen legacy classes. Its hazard filter requires membership in that mapping, so grouped `small_object`, `sharp` and `medicine` detections are currently excluded from spatial risk scoring; the default weight does not rescue them after that filter. The merged `pen` group retains a pen-only weight. See the [spatial integration assessment](SPATIAL_ANALYSIS.md#seven-class-integration-gap). The existing alias for `medicine_syrup` does not handle grouped `medicine`. This documentation update records the mismatch without changing application behaviour or choosing new risk weights.
+The current spatial mapping includes all seven final groups. The remaining issue is validation of the risk policy, rather than missing group entries. See [implemented weights and remaining checks](SPATIAL_ANALYSIS.md#seven-class-integration-and-remaining-checks).
 
 ## Conclusion
 
@@ -266,11 +266,11 @@ The experiments also identify which intuitively attractive changes did not help 
     <tr><td align="center">Retain Exp3 as the selected detector</td><td align="center">Highest mAP across all four reported sets; 0.888 clean-test recall at the fixed operating threshold</td><td align="center">Best among these tested runs, not a guarantee for unseen camera scenes</td></tr>
     <tr><td align="center">Keep Exp6 out of the recommended configuration</td><td align="center">More FP and FN on clean and stress test; no tested classifier threshold meets validation recall target</td><td align="center">Applies to this classifier, proposal pipeline and settings</td></tr>
     <tr><td align="center">Prioritise small-object and difficult-class investigation</td><td align="center">Size-dependent recall, weak pen/sharp/battery recovery and severe-scale failures</td><td align="center">Specific causes and remedies still need targeted validation</td></tr>
-    <tr><td align="center">Complete spatial and live-camera validation before application claims</td><td align="center">Grouped-label mapping is incomplete; no physical-range or end-to-end alert benchmark</td><td align="center">Dataset detection scores do not certify the complete monitoring system</td></tr>
+    <tr><td align="center">Complete spatial and live-camera validation before application claims</td><td align="center">Grouped-label weights remain unvalidated; no physical-range or end-to-end alert benchmark</td><td align="center">Dataset detection scores do not certify the complete monitoring system</td></tr>
   </tbody>
 </table>
 
-The contribution of this work is a traceable preparation and evaluation record, a defensible detector selection, and an evidence-based account of remaining failures. The next milestone is **correct seven-group application integration followed by representative camera and alert testing**, rather than treating the higher mAP alone as proof that the monitoring problem is solved. A missing detection must never be presented as proof of a safe scene.
+The contribution of this work is a traceable preparation and evaluation record, a defensible detector selection, and an evidence-based account of remaining failures. The next milestone is **validation of grouped risk policies and representative camera/alert testing**, rather than treating the higher mAP alone as proof that the monitoring problem is solved. A missing detection must never be presented as proof of a safe scene.
 
 ## Reproduction and records
 
@@ -286,7 +286,7 @@ The baseline source session was stopped after completing baseline and Exp1; its 
 
 The repository contains the result tables, figures, training histories and split record needed to follow the documented findings. Full datasets and model checkpoints are stored separately. Obtain the selected checkpoint from the team and place it at weights/final_best.pt; source-session records and checkpoint checksums remain in the [artifact manifest](../configs/model_training/artifact_manifest.json).
 
-Original public-image sources and earlier V2/V3 report citations still require attribution before final submission.
+The README lists [selected public-image sources](../README.md#1-public-datasets-selected-sources). That list is incomplete; a full source inventory and any missing earlier-project citations still need to be recovered before final submission.
 
 To verify a downloaded model on Windows:
 
@@ -301,4 +301,4 @@ Compare the result with the `final_best.pt` entry in the manifest. Existing `wei
 - [Ultralytics YOLOv8](https://docs.ultralytics.com/models/yolov8/): model family.
 - [Ultralytics validation](https://docs.ultralytics.com/modes/val/): mAP and evaluator documentation.
 - [Albumentations](https://albumentations.ai/docs/): image and bounding-box transformations. Current documentation may describe newer releases; recorded versions above govern this experiment.
-- Internal evidence: notebook Sections 6–10 and the linked CSVs/training histories. Original public-image sources and earlier-project bibliographic details remain to be completed; no missing source attribution has been invented.
+- Internal evidence: notebook Sections 6–10 and the linked CSVs/training histories. Selected public sources appear in the README. Complete source provenance and missing earlier-project bibliographic details remain outstanding.

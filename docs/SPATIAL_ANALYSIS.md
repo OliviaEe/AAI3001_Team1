@@ -50,7 +50,7 @@ Each `Detection` carries a label, confidence, pixel-coordinate box `(x1, y1, x2,
 
 All person-hazard pairs are evaluated and the highest pair score is returned. This avoids selecting only the most confident person and missing a hazard near another person. It is not object tracking, and the selected pair can change between frames.
 
-If there is no person, or no recognised hazard, the raw analyzer returns zero with an explanatory message. That is a limitation of available inputs, not a declaration that the physical scene is safe. An unknown/grouped label can trigger the same absence of recognised hazards; see the integration gap below.
+If there is no person, or no recognised hazard, the raw analyzer returns zero with an explanatory message. That is a limitation of available inputs, not a declaration that the physical scene is safe. An unknown label can trigger the same absence of recognised hazards. All seven final groups are recognised by the current mapping; their weight choices still need validation, as described below.
 
 ## Image-plane proximity
 
@@ -132,26 +132,25 @@ The current `TimedClassifier` measures map age from the **submission time of its
 
 Live scores rise immediately but persist through brief drops using a **one-second `ScoreHold`**, followed by an additional limit on how quickly the displayed score can fall. The displayed level can therefore outlast the current frame's raw result. This reduces flicker but introduces persistence and clearance delay; it is not tracking or proof a hazard remains present. Alert behaviour depends on additional UI duration/cooldown settings, not just the raw spatial zone.
 
-## Seven-class integration gap
+<a id="seven-class-integration-gap"></a>
 
-**This is a current implementation gap, not only a documentation mismatch.** The selected checkpoint outputs seven groups, while `DANGER_WEIGHTS` contains the original fine-grained hazard names. `SpatialAnalyzer.assess()` filters hazards to that dictionary before applying weights. Therefore the default weight does not automatically cover an unrecognised group.
+## Seven-class integration and remaining checks
 
-<table align="center">
-  <thead>
-    <tr><th align="center">Final detector label</th><th align="center">Current spatial handling</th><th align="center">Consequence</th></tr>
-  </thead>
-  <tbody>
-    <tr><td align="center"><code>battery</code></td><td align="center">Recognised; weight 0.85</td><td align="center">Included in pairwise scoring</td></tr>
-    <tr><td align="center"><code>coin_battery</code></td><td align="center">Recognised; weight 1.0</td><td align="center">Included</td></tr>
-    <tr><td align="center"><code>coin</code></td><td align="center">Recognised; weight 0.8</td><td align="center">Included</td></tr>
-    <tr><td align="center"><code>pen</code></td><td align="center">Recognised; weight 0.3</td><td align="center">Included, but same low weight now covers pen caps</td></tr>
-    <tr><td align="center"><code>small_object</code></td><td align="center">Not in dictionary</td><td align="center">Excluded from spatial hazard scoring</td></tr>
-    <tr><td align="center"><code>sharp</code></td><td align="center">Not in dictionary</td><td align="center">Excluded from spatial hazard scoring</td></tr>
-    <tr><td align="center"><code>medicine</code></td><td align="center">Not in dictionary</td><td align="center">Excluded from spatial hazard scoring</td></tr>
-  </tbody>
-</table>
+The current `DANGER_WEIGHTS` mapping recognises all seven final detector groups as well as legacy class names. `SpatialAnalyzer.assess()` includes these labels in pairwise risk scoring. The table records the implemented weights, not validated injury probabilities.
 
-The existing `medicine_syrup -> liquid_medicine` alias handles an older fine-grained label, not the final `medicine` group. UI hazard-presence checks also use the dictionary, so grouped labels can be present in detector outputs without being treated as recognised hazards downstream.
+| Final detector label | Current weight | Interpretation / remaining check |
+|:---|:---:|:---|
+| `battery` | 0.85 | Included in pairwise scoring |
+| `coin_battery` | 1.00 | Included in pairwise scoring |
+| `coin` | 0.80 | Included in pairwise scoring |
+| `small_object` | 0.75 | Shared weight for bottle caps, dice, marbles and small toys |
+| `pen` | 0.30 | Legacy pen weight also covers pen caps; review this grouped policy |
+| `sharp` | 1.00 | Shared weight for knives and scissors |
+| `medicine` | 0.95 | Shared weight for the merged medicine classes |
+
+The legacy `medicine_syrup` to `liquid_medicine` alias remains available. The final `medicine` group has its own explicit entry and does not depend on that alias.
+
+Recognised labels can reach the spatial calculation, but dictionary coverage alone does not validate the chosen severity weights, alert thresholds or real-camera performance. Group predictions cannot recover the original fine-grained item, so the pen-cap distinction needs an explicit group-level policy.
 
 ## Existing checks and what they do not establish
 
@@ -167,17 +166,17 @@ The existing `medicine_syrup -> liquid_medicine` alias handles an older fine-gra
   </tbody>
 </table>
 
-These sources show the intended logical checks. They do not provide a labelled real-world spatial benchmark, calibrated centimetre error, reachability accuracy or missed/false-alert rate. Their presence is not a fresh passing test result; tests were not rerun for this documentation-only update. The stand-in hazard tests include legacy labels and do not establish complete seven-group integration.
+These sources show the intended logical checks. They do not provide a labelled real-world spatial benchmark, calibrated centimetre error, reachability accuracy or missed/false-alert rate. The stand-in hazard tests include legacy examples and a check that every loaded model class has a danger weight. This checks label coverage, not whether each class has an appropriate risk weight. These documentation edits do not report a new test run.
 
 For an appropriate local environment, the existing automated checks can be invoked with:
 
 ```powershell
-python -m pytest modules/tests/test_depth_logic.py modules/tests/test_hazard_pipeline.py -q
+.\.venv\Scripts\python.exe -m pytest modules/tests/test_depth_logic.py modules/tests/test_hazard_pipeline.py -q
 ```
 
 ## Limitations and next validation steps
 
-1. **Finish label integration first.** Verify each of the seven detector labels produces the agreed spatial treatment; include the pen-cap grouping decision and UI presence checks.
+1. **Validate grouped-label treatment.** All seven labels are now recognised. Check their agreed risk weights, the pen-cap grouping decision and the resulting UI/alert behaviour.
 2. **Define a spatial reference task.** Decide whether a positive case means close in the image, same depth, within reach or actual contact. These are different targets; the current formula addresses relative box/depth separation.
 3. **Collect recorded camera cases.** Fix camera height/resolution, record object/person positions, include foreground/background overlap, occlusions, truncated people, multiple people and no-person/empty scenes. Physical measurements must be observed, not inferred from box heights.
 4. **Assess timing as well as geometry.** Measure capture-to-detection, depth age, displayed-score persistence and notification delay on deployment hardware, including stale/depth-failure fallback.
