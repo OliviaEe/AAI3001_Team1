@@ -12,7 +12,7 @@
 | Setup | Deploys from GitHub | Scripts in [`deploy/gcp/`](../deploy/gcp/) |
 | Camera relay | Cloudflare TURN (keys in Streamlit Secrets) | Cloudflare TURN (keys in `.env`) |
 
-### Streamlit Community Cloud (main)
+## Streamlit Community Cloud (main)
 
 The Child Safety Monitor is deployed on **Streamlit Community Cloud** through Olivia's GitHub fork.
 
@@ -32,7 +32,7 @@ For remote camera connection issues, see the
 
 Cloud testing confirmed that uploaded-image inference, live camera monitoring, and Telegram alert delivery work. A teammate who previously could not connect their camera successfully tested live monitoring after Cloudflare TURN was configured. Processing speed depends on the available cloud resources and network connection. TURN improves connectivity but does not increase the app's CPU resources. Local database storage is not guaranteed to persist across cloud rebuilds or restarts.
 
-### Google Cloud (backup)
+## Google Cloud (backup)
 
 If Streamlit Community Cloud is down, asleep or too slow for a demo, the same `app.py` can run on a Google Cloud Compute Engine virtual machine (VM). It provides dedicated resources and incurs charges while running. The performance table below records the team's CPU-server measurements; results depend on workload and hardware. One PowerShell script on your PC, [`deploy/gcp/vm.ps1`](../deploy/gcp/vm.ps1), creates, updates, starts and stops it. The VM opens **no inbound ports**:
 
@@ -45,7 +45,7 @@ Browser <--video--> Cloudflare TURN relay   <--> VM: streamlit-webrtc (aiortc)
 - **Live video:** WebRTC tries a direct connection first and falls back to the [Cloudflare TURN relay](https://developers.cloudflare.com/realtime/turn/), the same relay used by Streamlit Community Cloud. The relay lets the camera work on mobile data and school or office Wi-Fi, which often block direct connections.
 - **App service:** the app runs as a `systemd` service, so it starts on boot and restarts if it crashes.
 
-#### Servers
+### Servers
 
 | Option | Machine | Approx. cost while running | Notes |
 |:---|:---|:---|:---|
@@ -54,7 +54,7 @@ Browser <--video--> Cloudflare TURN relay   <--> VM: streamlit-webrtc (aiortc)
 
 Both use zone `asia-southeast1-b` (Singapore). A stopped VM costs nothing for compute; its 30–40 GB disk costs a few dollars a month. The prices above are recorded estimates rather than current quotes; check the [Google Cloud pricing calculator](https://cloud.google.com/products/calculator).
 
-#### Prerequisites (once)
+### Prerequisites (once)
 
 1. **Google Cloud project with billing.** Install the [Google Cloud CLI](https://cloud.google.com/sdk/docs/install), run `gcloud init`, then enable Compute Engine:
    ```powershell
@@ -71,7 +71,7 @@ Both use zone `asia-southeast1-b` (Singapore). A stopped VM costs nothing for co
 | `TELEGRAM_BOT_TOKEN` | No | Caregiver alerts. Without it, alerts are off |
 | `MODEL_THREADS` | No | CPU threads for the models. Leave unset: laptops use 2, the setup script uses half the VM's vCPUs |
 
-#### First deployment
+### First deployment
 
 Run from the repository root:
 
@@ -88,7 +88,7 @@ powershell -ExecutionPolicy Bypass -File deploy\gcp\vm.ps1 setup    # install an
 
 Add `-Gpu` to every command to manage the GPU server instead. Its first `setup` may restart the VM once to load the NVIDIA driver; the script handles this.
 
-#### Everyday use
+### Everyday use
 
 | Task | Command (`powershell -ExecutionPolicy Bypass -File deploy\gcp\vm.ps1 …`) |
 |:---|:---|
@@ -104,19 +104,19 @@ Add `-Gpu` to every command to manage the GPU server instead. Its first `setup` 
 - **The first page load after a start takes about a minute** while the models load.
 - In the Cloud Console (**Compute Engine → VM instances**) you can also start or stop the VM, but run `url` afterwards to get the link.
 
-#### Performance (CPU server)
+### Measured processing latency (CPU server)
 
 Team-recorded timings from the live app (**Performance details → Latency**). These measurements describe the processing shown by that panel, not camera-to-notification latency or a guaranteed frame rate:
 
-| `MODEL_THREADS` | Latency per frame |
+| `MODEL_THREADS` | Reported processing latency per frame |
 |:---:|:---:|
 | 2 (laptop default) | 140–190 ms |
 | **4 (VM default)** | **100–130 ms** |
 | 6 | 115–135 ms |
 
-More threads is not always faster: the detectors and the depth model run at the same time and compete for cores. At about 120 ms per frame, **Settings → Max model runs / second** can be raised from 5 to about 8.
+In these measurements, using more threads did not consistently reduce latency. Detection and background depth processing compete for CPU resources. The **Max model runs / second** setting controls inference scheduling; increasing it does not guarantee an equivalent camera frame rate. Capture, network transport, rendering and alert delivery add separate delays.
 
-#### Notes
+### Notes
 
 - **One Telegram poller per bot token.** Do not run the Google Cloud VM, Streamlit Community Cloud and a local copy with the same `TELEGRAM_BOT_TOKEN` at the same time, or bot commands will conflict.
 - **Subscriptions persist** on the VM's disk (`subscribers.db`) across stop and start, unlike Streamlit Community Cloud. They are lost if the VM is deleted.
