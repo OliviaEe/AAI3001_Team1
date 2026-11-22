@@ -107,10 +107,13 @@ Passing functional tests does not establish reliable real-camera hazard detectio
 
 ## Telegram alerts
 
+The project bot is **CVDL Child Safety** ([@childsafetyalertcvdl_bot](https://t.me/childsafetyalertcvdl_bot)).
 Create `.streamlit/secrets.toml` (already ignored by Git):
 
 ```toml
 TELEGRAM_BOT_TOKEN = "your_bot_token"
+# Optional fallback for invite links if the getMe lookup fails
+TELEGRAM_BOT_USERNAME = "childsafetyalertcvdl_bot"
 ```
 
 How recipients are organised:
