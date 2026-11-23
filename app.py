@@ -734,7 +734,7 @@ with navigation:
                 st.caption(f"{classifier.mode} · {os.path.basename(detector.weights_path)}")
                 if detector is classifier:
                     st.caption("Put the notebook's `final_best.pt` in `weights/` and restart "
-                               "to detect all 14 hazard classes.")
+                               "to detect all 7 hazard groups.")
                 if classifier.depth_error:
                     st.caption("Depth: off, distances use the image plane only. The depth model "
                                "needs `transformers` and internet on first run.")
@@ -924,7 +924,7 @@ with tab_live:
         st.error(f"{model_problem} The app is running in demo mode with random scores.")
     elif model_pill == "Stock model + spatial":
         st.info("Only person, knife and scissors can be detected. Put Tze's `final_best.pt` in "
-                "`weights/` and restart the app to detect all 14 hazard classes.")
+                "`weights/` and restart the app to detect all 7 hazard groups.")
     left, right = st.columns([1.85, 1], gap="medium")
     with left:
         with st.container(border=True, key="preview_camera_card"):
