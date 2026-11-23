@@ -208,7 +208,7 @@ class SpatialDemoClassifier(BaseClassifier):
 
 
 class HazardSpatialClassifier(SpatialDemoClassifier):
-    """Full pipeline: Tze's trained model finds and names the hazard (14 classes),
+    """Full pipeline: Tze's trained model finds and names the hazard (7 groups),
     the stock COCO model finds the person used as the child reference, depth is
     added to every box, and Ayumi & Nic's SpatialAnalyzer turns hazard type +
     distance to the child into the danger score."""

@@ -285,7 +285,8 @@ class BotPoller:
             try:
                 self.handle(u)
             except Exception as e:            # one bad update must not stop the bot
-                print(f"[telegram] update {u.get('update_id')} failed: {e!r}")
+                # Only the error type: network errors include the request URL, which holds the bot token.
+                print(f"[telegram] update {u.get('update_id')} failed: {type(e).__name__}")
 
 
 def start_poller(token: str, store: SubscriptionStore,
